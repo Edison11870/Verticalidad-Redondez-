@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análisis Topográfico · Ovalidad & Verticalidad API 653</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  
+  :root {
+    /* Tema Claro Profesional */
+    --bg: #f4f7f9;
+    --surface: #ffffff;
+    --surface2: #f8fafc;
+    --border: #cbd5e1;
+    --border2: #94a3b8;
+    --text: #0f172a;
+    --text2: #334155;
+    --text3: #64748b;
+    --accent: #2563eb;
+    --accent2: #1d4ed8;
+    
+    /* Colores API 653 */
+    --c-ok: #00b050;       /* Verde Excel */
+    --c-warn: #ffc000;     /* Amarillo Excel */
+    --c-crit: #ff0000;     /* Rojo Excel */
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+  
+  /* HEADER & TABS */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 32px; display: flex; align-items: center; gap: 16px; height: 64px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
+  .logo { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; }
+  header h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text); }
+  .sub { color: var(--text2); font-size: 13px; font-weight: 500; }
+  .norm-badge { margin-left: auto; background: #eff6ff; border: 1px solid #bfdbfe; color: var(--accent); font-size: 12px; font-family: 'IBM Plex Mono', monospace; padding: 5px 14px; border-radius: 20px; font-weight: 700; }
+  
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 32px; }
+  .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; color: var(--text3); font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; padding: 14px 24px; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tab-btn:hover { color: var(--accent); background: rgba(37,99,235,0.03); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(37,99,235,0.05); }
+  
+  /* MAIN LAYOUT */
+  .main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: #f8fafc; }
+  .card-header h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text); }
+  .card-body { padding: 20px; }
+  
+  /* UPLOAD & INPUTS */
+  .upload-zone { border: 2px dashed var(--border2); border-radius: 8px; padding: 32px 20px; text-align: center; cursor: pointer; transition: all .2s; position: relative; background: #f8fafc; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #eff6ff; }
+  .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-zone h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 700; margin-top: 12px; color: var(--text); }
+  .upload-zone p { color: var(--text2); font-size: 13px; margin-top: 4px; }
+  .upload-zone .fmt { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); margin-top: 8px; font-weight: 600; }
+  
+  .params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .section-title { grid-column: 1 / -1; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; color: var(--text); font-size: 15px; border-bottom: 2px solid var(--border); padding-bottom: 6px; margin-bottom: 4px; margin-top: 8px; text-transform: uppercase; }
+  label { display: block; font-size: 12px; font-family: 'Barlow Condensed', sans-serif; color: var(--text2); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .lbl-warn { color: #d97706; } .lbl-crit { color: #dc2626; }
+  input[type=number] { width: 100%; background: #ffffff; border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 14px; padding: 8px 12px; outline: none; transition: all .15s; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+  
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 0.5px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-sec { background: var(--surface); color: var(--text); border: 1px solid var(--border2); }
+  .btn-sec:hover { border-color: var(--accent); color: var(--accent); background: #eff6ff; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+  
+  /* GRIDS */
+  .grid-2-1 { display: grid; grid-template-columns: 350px 1fr; gap: 24px; align-items: start; }
+  @media(max-width:1100px) { .grid-2-1 { grid-template-columns: 1fr; } }
+  
+  /* TABLAS DE REPORTE (Estilo Excel) */
+  .report-wrap { overflow-x: auto; background: #fff; padding: 10px; }
+  .report-table { width: 100%; border-collapse: collapse; font-family: 'Arial', sans-serif; font-size: 11px; text-align: center; color: #000; border: 2px solid #000; white-space: nowrap; }
+  .report-table th, .report-table td { border: 1px solid #000; padding: 4px 6px; vertical-align: middle; }
+  .report-table thead th { background-color: #d9d9d9; font-weight: bold; }
+  .report-table .header-main { background-color: #d9d9d9; font-size: 12px; letter-spacing: 1px; }
+  .report-table td[contenteditable="true"] { background-color: #f8f9fa; cursor: text; transition: background 0.2s; }
+  .report-table td[contenteditable="true"]:hover, .report-table td[contenteditable="true"]:focus { background-color: #e2e8f0; outline: none; }
+  
+  .c-ok { background-color: var(--c-ok); color: #fff; font-weight: bold; }
+  .c-warn { background-color: var(--c-warn); color: #000; font-weight: bold; }
+  .c-crit { background-color: var(--c-crit); color: #fff; font-weight: bold; }
+  
+  /* LEYENDA TIPO REPORTE */
+  .report-legend { width: 100%; border-collapse: collapse; font-family: 'Arial', sans-serif; font-size: 11px; text-align: center; color: #000; border: 2px solid #000; margin-top: 10px; max-width: 800px; margin-left: auto; margin-right: auto; }
+  .report-legend th, .report-legend td { border: 1px solid #000; padding: 6px; }
+  .report-legend th { background-color: #d9d9d9; font-weight: bold; }
+  .box-leg { display: inline-block; width: 100%; height: 16px; border: 1px solid #000; }
+  .lbl-fig { text-align: center; font-family: 'Arial', sans-serif; font-size: 13px; font-style: italic; margin-top: 8px; margin-bottom: 24px; color: #000; }
+
+  /* FILES */
+  .files-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+  .fitem { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  .fitem input.fn { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 700; color: var(--accent); border: 1px dashed transparent; background: transparent; padding: 2px 4px; border-radius: 4px; width: 85px; transition: all .2s; }
+  .fitem input.fn:hover { border-color: var(--border2); background: rgba(0,0,0,0.02); cursor: text; }
+  .fitem input.fn:focus { border-color: var(--accent); background: #fff; outline: none; border-style: solid; }
+  .fitem .f-info { font-size: 11px; color: var(--text3); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fdel { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; transition: all .2s; }
+  .fdel:hover { color: var(--c-crit); }
+  
+  .empty { text-align: center; padding: 60px 20px; color: var(--text3); }
+  
+  .chart-wrap { background: #ffffff; padding: 20px; display: flex; justify-content: center; align-items: center; }
+  .ring-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .rtab { background: #f8fafc; border: 1px solid var(--border); color: var(--text2); font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 6px; cursor: pointer; transition: all .2s; text-transform: uppercase; }
+  .rtab:hover { border-color: var(--accent); color: var(--accent); }
+  .rtab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .ml-auto { margin-left: auto; } .flex { display: flex; } .gap8 { gap: 8px; } .mb0 { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+  </div>
+  <div>
+    <h1>Inspección de Tanques API 653</h1>
+    <div class="sub">Reporte de Análisis Topográfico Avanzado</div>
+  </div>
+  <span class="norm-badge">CÓDIGO API 653</span>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('ovalidad')" id="tb-oval">Ovalidad (Redondez)</button>
+  <button class="tab-btn" onclick="switchTab('verticalidad')" id="tb-vert">Verticalidad (Plumbness)</button>
+</div>
+
+<div class="main">
+
+<!-- ══ OVALIDAD ══ -->
+<div id="tab-ovalidad" class="tab-content active">
+  <div class="grid-2-1">
+    
+    <!-- Panel Izquierdo: Carga y Parámetros -->
+    <div>
+      <div class="card">
+        <div class="card-header"><h2>1. Cargar Topografía</h2></div>
+        <div class="card-body">
+          <div class="upload-zone" id="oval-drop">
+            <input type="file" accept=".txt,.csv" id="oval-input" multiple onchange="handleOvalFiles(this)">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" style="margin-bottom:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <h3>Subir Archivos (TXT/CSV)</h3>
+            <div class="fmt">Formato: PENZD (Pto, Este, Norte, Z, Desc)</div>
+            <p style="font-size: 11px; margin-top: 8px;">Puede seleccionar múltiples anillos a la vez.</p>
+          </div>
+          <div id="oval-files" class="files-list" style="display:none"></div>
+        </div>
+      </div>
+      
+      <div class="card mb0">
+        <div class="card-header"><h2>2. Parámetros y Tolerancias</h2></div>
+        <div class="card-body" style="padding: 16px 20px;">
+          <div class="params-grid">
+            <div class="section-title">Geometría y Ejes</div>
+            <div><label>Número de Ejes</label><input type="number" id="op-ejes" value="18" min="4" onchange="updateOvalAnalysis()"></div>
+            <div><label>Altura Tanque (m)</label><input type="number" id="op-h" value="3.0" step="0.1" min="0.1" onchange="updateOvalAnalysis()"></div>
+            
+            <div class="section-title">Tolerancias Redondez</div>
+            <div><label>Aceptable (≤)</label><input type="number" id="op-tok" value="13" step="1" onchange="updateOvalAnalysis()"></div>
+            <div><label class="lbl-crit">Crítico (>)</label><input type="number" id="op-crit" value="15" step="1" onchange="updateOvalAnalysis()"></div>
+          </div>
+          <div class="flex gap8 mt12" style="justify-content: flex-end; margin-top: 20px;">
+            <button class="btn btn-sec btn-sm" onclick="clearOval()">Limpiar Todo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Derecho: Resultados -->
+    <div id="oval-results" style="display:none;">
+      
+      <div class="card">
+        <div class="card-header">
+          <h2>Diagrama Radial de Redondez</h2>
+          <div class="ml-auto flex gap8">
+            <button class="btn btn-sec btn-sm" onclick="dlChart('radar-export-area','Diagrama_Redondez')">⬇ Descargar para Word</button>
+          </div>
+        </div>
+        <div class="card-body" style="background: #f8fafc;">
+          <div style="font-size:12px; font-weight:bold; margin-bottom:8px; color:var(--text2); text-transform:uppercase;">Seleccionar anillo para el gráfico:</div>
+          <div class="ring-tabs" id="oval-rtabs"></div>
+          
+          <div id="radar-export-area" style="background: #ffffff; padding: 20px; border: 1px solid #e2e8f0;">
+            <div id="radar-title-export" style="text-align: center; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; margin-bottom: 10px;">ANALISIS DE REDONDEZ</div>
+            <div class="chart-wrap" style="height: 500px; padding: 0;">
+              <canvas id="cRadarOval"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Matriz de Resultados - Redondez (mm)</h2>
+          <div class="ml-auto">
+            <button class="btn btn-sec btn-sm" onclick="dlChart('table-oval-export','Tabla_Redondez')">⬇ Capturar Tabla</button>
+            <button class="btn btn-primary btn-sm" onclick="csvOvalMatrix()">Exportar CSV</button>
+          </div>
+        </div>
+        <div class="card-body" style="background: #f8fafc; overflow-x: auto;">
+          
+          <div id="table-oval-export" style="background: #ffffff; padding: 20px; display: inline-block; min-width: 100%;">
+            <!-- Tabla Matriz -->
+            <table class="report-table" id="matrix-oval">
+              <thead id="matrix-oval-head"></thead>
+              <tbody id="matrix-oval-body"></tbody>
+            </table>
+            <div class="lbl-fig">Cuadro de resultados de redondez del tanque.</div>
+            
+            <!-- Leyenda -->
+            <table class="report-legend">
+              <thead>
+                <tr>
+                  <th colspan="2">CONDICIÓN EVALUADA</th>
+                  <th>DESCRIPCIÓN</th>
+                  <th>RANGO DE DESVIACIÓN</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="width: 30px;"><div class="box-leg c-ok"></div></td>
+                  <td style="font-weight: bold;">ACEPTABLE</td>
+                  <td>DENTRO DE TOLERANCIA</td>
+                  <td id="leg-oval-ok">0 a +/- 13mm</td>
+                </tr>
+                <tr>
+                  <td><div class="box-leg c-warn"></div></td>
+                  <td style="font-weight: bold;">OBSERVACIÓN</td>
+                  <td>DESVIACIÓN LEVE, NO CRITICA, PERO REQUIERE OBSERVACIÓN</td>
+                  <td id="leg-oval-warn">+/- 14mm hasta +/- 15mm</td>
+                </tr>
+                <tr>
+                  <td><div class="box-leg c-crit"></div></td>
+                  <td style="font-weight: bold;">CRITICO</td>
+                  <td>FUERA DE TOLERANCIA, IGUAL O SUPERIOR AL LIMITE MÁXIMO, REQUIERE ACCIÓN INMEDIATA</td>
+                  <td id="leg-oval-crit">+/- 15.01 mm a Mas</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="lbl-fig">Leyenda de los parámetros usados y los rangos de tolerancia – según API 653.</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div id="oval-empty" class="empty" style="grid-column: 2;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+      <h3 style="font-family:'Barlow Condensed'; font-size:24px; color:var(--text); margin-top:10px;">Esperando Datos</h3>
+      <p>Sube uno o más archivos topográficos PENZD para procesar la geometría.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VERTICALIDAD ══ -->
+<div id="tab-verticalidad" class="tab-content">
+  <div class="grid-2-1">
+    
+    <!-- Panel Izquierdo -->
+    <div>
+      <div class="card">
+        <div class="card-header"><h2>1. Cargar Datos (Verticalidad)</h2></div>
+        <div class="card-body">
+          <div class="upload-zone" id="vert-drop">
+            <input type="file" accept=".txt,.csv" id="vert-input" multiple onchange="handleVertFiles(this)">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" style="margin-bottom:8px;"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="7 8 12 3 17 8"/></svg>
+            <h3>Subir Archivos (TXT/CSV)</h3>
+            <p style="color:var(--accent2); font-weight:700; margin-top:8px;">El Anillo 1 cargado será la BASE (0%).</p>
+          </div>
+          <div id="vert-files" class="files-list" style="display:none"></div>
+        </div>
+      </div>
+      
+      <div class="card mb0">
+        <div class="card-header"><h2>2. Parámetros Verticalidad</h2></div>
+        <div class="card-body" style="padding: 16px 20px;">
+          <div class="params-grid">
+            <div class="section-title">Parámetros del Tanque</div>
+            <div><label>Número de Ejes</label><input type="number" id="vp-ejes" value="18" min="4" onchange="updateVertAnalysis()"></div>
+            <div><label>Altura Tanque (m)</label><input type="number" id="vp-h" value="3.0" step="0.1" min="0.1" onchange="updateVertAnalysis()"></div>
+            <div class="section-title">Tolerancias (mm)</div>
+            <div><label>Aceptable (≤)</label><input type="number" id="vp-obs" value="19" step="1" onchange="updateVertAnalysis()"></div>
+            <div><label class="lbl-crit">Crítico (>)</label><input type="number" id="vp-crit" value="30" step="1" onchange="updateVertAnalysis()"></div>
+          </div>
+          <div class="flex gap8 mt12" style="justify-content: flex-end; margin-top: 20px;">
+            <button class="btn btn-sec btn-sm" onclick="clearVert()">Limpiar Todo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Derecho -->
+    <div id="vert-results" style="display:none;">
+      
+      <div class="card">
+        <div class="card-header">
+          <h2>Matriz de Verticalidad (mm vs Base)</h2>
+          <div class="ml-auto">
+            <button class="btn btn-sec btn-sm" onclick="dlChart('table-vert-export','Tabla_Verticalidad')">⬇ Capturar Tabla</button>
+            <button class="btn btn-primary btn-sm" onclick="csvVertMatrix()">Exportar CSV</button>
+          </div>
+        </div>
+        <div class="card-body" style="background: #f8fafc; overflow-x: auto;">
+          
+          <div id="table-vert-export" style="background: #ffffff; padding: 20px; display: inline-block; min-width: 100%;">
+            <!-- Tabla Matriz -->
+            <table class="report-table" id="matrix-vert">
+              <thead id="matrix-vert-head"></thead>
+              <tbody id="matrix-vert-body"></tbody>
+            </table>
+            <div class="lbl-fig">Cuadro de resultados de verticalidad del tanque.</div>
+            
+            <!-- Leyenda -->
+            <table class="report-legend">
+              <thead>
+                <tr>
+                  <th colspan="2">CONDICIÓN EVALUADA</th>
+                  <th>DESCRIPCIÓN</th>
+                  <th>RANGO DE DESVIACIÓN</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="width: 30px;"><div class="box-leg c-ok"></div></td>
+                  <td style="font-weight: bold;">ACEPTABLE</td>
+                  <td>DENTRO DE TOLERANCIA</td>
+                  <td id="leg-vert-ok">0 a +/- 19mm</td>
+                </tr>
+                <tr>
+                  <td><div class="box-leg c-warn"></div></td>
+                  <td style="font-weight: bold;">OBSERVACIÓN</td>
+                  <td>DESVIACIÓN LEVE, NO CRITICA, PERO REQUIERE OBSERVACIÓN</td>
+                  <td id="leg-vert-warn">+/- 20mm hasta +/- 30mm</td>
+                </tr>
+                <tr>
+                  <td><div class="box-leg c-crit"></div></td>
+                  <td style="font-weight: bold;">CRITICO</td>
+                  <td>FUERA DE TOLERANCIA, IGUAL O SUPERIOR AL LIMITE MÁXIMO, REQUIERE ACCIÓN INMEDIATA</td>
+                  <td id="leg-vert-crit">+/- 30.01 mm a Mas</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="lbl-fig">Leyenda de los parámetros usados y los rangos de tolerancia – según API 653.</div>
+          </div>
+
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">
+          <h2>Gráfico de Desplazamiento Horizontal (Plumbness)</h2>
+          <div class="ml-auto"><button class="btn btn-sec btn-sm" onclick="dlChart('vert-chart-export','Grafico_Verticalidad')">⬇ Descargar Imagen</button></div>
+        </div>
+        <div class="card-body" style="background: #f8fafc;">
+          <div id="vert-chart-export" style="background: #ffffff; padding: 20px; border: 1px solid #e2e8f0;">
+             <div style="text-align: center; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; margin-bottom: 10px;">PERFIL DE VERTICALIDAD POR EJE</div>
+            <div class="chart-wrap" style="height: 450px; padding:0;">
+              <canvas id="cVertMain"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="vert-empty" class="empty" style="grid-column: 2;">
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:64px;height:64px;"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="7 8 12 3 17 8"/></svg>
+      <h3 style="font-family:'Barlow Condensed'; font-size:24px; color:var(--text); margin-top:10px;">Requiere 2 o más anillos</h3>
+      <p>Cargue los levantamientos topográficos (TXT) para evaluar el desplome frente al anillo base.</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- .main -->
+
+<!-- Librerías -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+'use strict';
+
+/* ── ESTADO GLOBAL ── */
+const S = { ovalRings: [], activeOvalIdx: 0, vertRings: [], charts: {} };
+const COLORS = ['#1d4ed8', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#1e293b'];
+
+/* ── CONFIGURACIÓN DE CHART.JS (Modo Claro/Impresión) ── */
+Chart.defaults.color = '#334155'; 
+Chart.defaults.borderColor = '#e2e8f0'; 
+Chart.defaults.font.family = "Arial, sans-serif";
+
+/* ── PARSER TOPOGRÁFICO EXACTO (PENZD) ── */
+function parsePENZD(txt) {
+  const pts = [];
+  txt.trim().split('\n').forEach(raw => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || line.startsWith('//')) return;
+    const c = line.split(/[\t,;]+/);
+    if (c.length < 4) return;
+    
+    const x = parseFloat(c[1]); // Este
+    const y = parseFloat(c[2]); // Norte
+    const z = parseFloat(c[3]); // Cota
+    
+    if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+    pts.push({ id: c[0].trim(), x, y, z });
+  });
+  return pts;
+}
+
+/* ── MATEMÁTICAS: OBTENER COTA (Z) PROMEDIO ── */
+function getAverageZ(pts) {
+  if (!pts || !pts.length) return 0;
+  return pts.reduce((sum, p) => sum + p.z, 0) / pts.length;
+}
+
+/* ── MATEMÁTICAS: AJUSTE DE CÍRCULO POR MÍNIMOS CUADRADOS (KASA) ── */
+function fitCircle(pts) {
+  if (pts.length < 3) {
+    let cx = 0, cy = 0;
+    pts.forEach(p => { cx += p.x; cy += p.y; });
+    return { cx: cx / pts.length, cy: cy / pts.length, rFit: 0 };
+  }
+  
+  let sumX = 0, sumY = 0;
+  pts.forEach(p => { sumX += p.x; sumY += p.y; });
+  let meanX = sumX / pts.length, meanY = sumY / pts.length;
+
+  let suu = 0, suv = 0, svv = 0, suuu = 0, svvv = 0, suvv = 0, svuu = 0;
+  pts.forEach(p => {
+    let u = p.x - meanX, v = p.y - meanY;
+    suu += u * u; suv += u * v; svv += v * v;
+    suuu += u * u * u; svvv += v * v * v;
+    suvv += u * v * v; svuu += v * u * u;
+  });
+
+  let det = (suu * svv - suv * suv);
+  if (Math.abs(det) < 1e-8) return { cx: meanX, cy: meanY, rFit: 0 }; 
+  
+  let uc = (0.5 * (suuu + suvv) * svv - 0.5 * (svvv + svuu) * suv) / det;
+  let vc = (0.5 * (svvv + svuu) * suu - 0.5 * (suuu + suvv) * suv) / det;
+
+  let cx = uc + meanX, cy = vc + meanY, sumR = 0;
+  pts.forEach(p => { sumR += Math.sqrt((p.x - cx)**2 + (p.y - cy)**2); });
+  return { cx, cy, rFit: sumR / pts.length };
+}
+
+/* ── ASIGNACIÓN DE EJES CON SOPORTE DE CENTRO FORZADO (PARA VERTICALIDAD) ── */
+function assignAxes(pts, nEjes, forcedCx = null, forcedCy = null) {
+  let cx, cy, rFit;
+  
+  if (forcedCx !== null && forcedCy !== null) {
+      cx = forcedCx;
+      cy = forcedCy;
+      rFit = 0; 
+  } else {
+      const fit = fitCircle(pts);
+      cx = fit.cx;
+      cy = fit.cy;
+      rFit = fit.rFit;
+  }
+
+  const step = 360 / nEjes;
+  const axes = Array.from({ length: nEjes }, (_, i) => ({ 
+      idx: i + 1, angle: i * step, bestPt: null, dist: null, minBd: 999 
+  }));
+  
+  pts.forEach(p => {
+    const ang = ((Math.atan2(p.x - cx, p.y - cy) * 180 / Math.PI) + 360) % 360;
+    let bi = 0, bd = 999;
+    axes.forEach((ax, i) => { 
+        let d = Math.abs(ang - ax.angle); 
+        if(d > 180) d = 360 - d; 
+        if(d < bd) { bd = d; bi = i; } 
+    });
+    if (bd < axes[bi].minBd) {
+        axes[bi].bestPt = p;
+        axes[bi].dist = Math.sqrt((p.x - cx)**2 + (p.y - cy)**2);
+        axes[bi].minBd = bd;
+    }
+  });
+
+  return {
+    center: { cx, cy, rFit },
+    devs: axes.map(ax => {
+      if (!ax.bestPt) return { idx: ax.idx, angle: ax.angle, dev: 0, missing: true, bestPt: null, dist: null };
+      const dev = Math.round((ax.dist - rFit) * 1000); 
+      return { idx: ax.idx, angle: ax.angle, dev, missing: false, bestPt: ax.bestPt, dist: ax.dist };
+    })
+  };
+}
+
+
+/* ── TAB OVALIDAD: FUNCIONALIDAD MULTI-ANILLO ── */
+
+function handleOvalFiles(inp) {
+  Array.from(inp.files).forEach(file => {
+    const rd = new FileReader();
+    rd.onload = e => {
+      const pts = parsePENZD(e.target.result);
+      if (!pts.length) return;
+      const num = S.ovalRings.length + 1;
+      S.ovalRings.push({ 
+        name: `ANILLO ${num}`, 
+        fileName: file.name.replace(/\.\w+$/, '').toUpperCase(),
+        points: pts 
+      });
+      updateOvalAnalysis();
+    };
+    rd.readAsText(file);
+  });
+  inp.value = ''; 
+}
+
+function updateOvalAnalysis() {
+  const el = document.getElementById('oval-files');
+  el.style.display = S.ovalRings.length ? 'flex' : 'none';
+  el.innerHTML = S.ovalRings.map((r, i) => `
+    <div class="fitem">
+      <input type="text" class="fn" value="${r.name}" onchange="renameOval(${i}, this.value)" title="Editar nombre del anillo">
+      <span class="f-info" title="${r.fileName}">${r.fileName}</span>
+      <button class="fdel" onclick="removeOval(${i})">✕</button>
+    </div>`).join('');
+  
+  if (S.ovalRings.length > 0) {
+    document.getElementById('oval-results').style.display = 'block';
+    document.getElementById('oval-empty').style.display = 'none';
+    if (S.activeOvalIdx >= S.ovalRings.length) S.activeOvalIdx = Math.max(0, S.ovalRings.length - 1);
+    
+    document.getElementById('oval-rtabs').innerHTML = S.ovalRings.map((r, i) => `
+      <button class="rtab ${i === S.activeOvalIdx ? 'active' : ''}" onclick="selectOvalRing(${i})">
+        ${r.name}
+      </button>`).join('');
+
+    const activeRing = S.ovalRings[S.activeOvalIdx];
+    const dataActive = assignAxes(activeRing.points, +document.getElementById('op-ejes').value || 18);
+    
+    document.getElementById('radar-title-export').textContent = `ANALISIS DE REDONDEZ - ${activeRing.name}`;
+    
+    drawRadarOval(dataActive);
+    buildOvalMatrixTable();
+    updateOvalLegendText();
+  } else {
+    document.getElementById('oval-results').style.display = 'none';
+    document.getElementById('oval-empty').style.display = 'flex';
+  }
+}
+
+function selectOvalRing(i) {
+  S.activeOvalIdx = i;
+  updateOvalAnalysis(); 
+}
+
+function renameOval(i, newName) {
+  if(newName.trim()) S.ovalRings[i].name = newName.trim();
+  updateOvalAnalysis();
+}
+
+function removeOval(i) {
+  S.ovalRings.splice(i, 1);
+  updateOvalAnalysis();
+}
+
+function clearOval() {
+  S.ovalRings = [];
+  S.activeOvalIdx = 0;
+  updateOvalAnalysis();
+}
+
+function getConditionClass(dev, tok, tcrit) {
+  const d = Math.abs(dev);
+  if (d > tcrit) return 'c-crit';
+  if (d > tok) return 'c-warn';
+  return 'c-ok';
+}
+
+function drawRadarOval(dataResult) {
+  if(S.charts['radarOval']) S.charts['radarOval'].destroy();
+  
+  const nEjes = +document.getElementById('op-ejes').value || 18;
+  const tOk = +document.getElementById('op-tok').value || 13;
+  const tCrit = +document.getElementById('op-crit').value || 15;
+  
+  const labels = Array.from({length: nEjes}, (_, i) => `${i+1}`);
+  const datasets = [];
+  
+  datasets.push({ label: 'Línea Base (0)', data: Array(nEjes).fill(0), borderColor: '#2563eb', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, order: 4 });
+  datasets.push({ label: `Tolerancia (+)`, data: Array(nEjes).fill(tCrit), borderColor: '#000000', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false, order: 3 });
+  datasets.push({ label: `Tolerancia (-)`, data: Array(nEjes).fill(-tCrit), borderColor: '#000000', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false, order: 2 });
+  
+  let minVal = -tCrit - 15, maxVal = tCrit + 15;
+  const dataDevs = dataResult.devs.map(d => d.dev);
+  
+  const pointColors = dataDevs.map(val => {
+    const absV = Math.abs(val);
+    if (absV > tCrit) return '#ef4444'; 
+    if (absV > tOk) return '#f59e0b';   
+    return '#10b981';                                  
+  });
+  
+  dataDevs.forEach(v => { if(v < minVal) minVal = v - 10; if(v > maxVal) maxVal = v + 10; });
+  
+  datasets.push({
+    label: 'Perfil Real', data: dataDevs, borderColor: '#0f172a', backgroundColor: 'transparent', borderWidth: 2,
+    pointStyle: 'circle', pointBackgroundColor: pointColors, pointBorderColor: '#0f172a', pointBorderWidth: 2,
+    pointRadius: 6, pointHoverRadius: 9, fill: false, tension: 0, order: 1
+  });
+
+  const ctx = document.getElementById('cRadarOval').getContext('2d');
+  S.charts['radarOval'] = new Chart(ctx, {
+    type: 'radar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: "Arial", size: 12, weight: 'bold' }, usePointStyle: false, boxWidth: 30, color: '#000' } },
+      },
+      scales: {
+        r: {
+          angleLines: { color: '#cbd5e1', lineWidth: 1 }, grid: { color: '#cbd5e1', lineWidth: 1, circular: false },
+          pointLabels: { color: '#000', font: { family: "Arial", size: 14, weight: 'bold' } },
+          ticks: { display: true, color: '#475569', backdropColor: 'transparent', stepSize: 10 },
+          suggestedMin: minVal, suggestedMax: maxVal
+        }
+      }
+    }
+  });
+}
+
+function buildOvalMatrixTable() {
+  const nEjes = +document.getElementById('op-ejes').value || 18;
+  const tankH = +document.getElementById('op-h').value || 3.0;
+  const tOk = +document.getElementById('op-tok').value || 13;
+  const tCrit = +document.getElementById('op-crit').value || 15;
+
+  let h1 = `<tr><th colspan="${3 + nEjes}" class="header-main">REDONDEZ - RESULTADOS EN (mm)</th></tr>`;
+  let h2 = `<tr>
+      <th rowspan="2">ANILLO</th>
+      <th rowspan="2" style="width:70px;">LECTURA<br>% DE<br>ALTURA</th>
+      <th rowspan="2" style="width:70px;">ALTURA DE<br>TANQUE<br>(mm)</th>
+      <th colspan="${nEjes}">EJES DE MEDICIÓN</th>
+    </tr>`;
+  let h3 = `<tr>`;
+  for(let i=0; i<nEjes; i++) h3 += `<th>${i+1}<br><span style="font-weight:normal;">${Math.round(i*360/nEjes)}°</span></th>`;
+  h3 += `</tr>`;
+  
+  document.getElementById('matrix-oval-head').innerHTML = h1 + h2 + h3;
+
+  // Calculamos la elevación base (Z mínimo de todos los anillos cargados)
+  const minZ = S.ovalRings.length > 0 ? Math.min(...S.ovalRings.map(r => getAverageZ(r.points))) : 0;
+
+  let tbody = '';
+  for(let i = S.ovalRings.length - 1; i >= 0; i--) {
+    const ring = S.ovalRings[i];
+    const dataResult = assignAxes(ring.points, nEjes);
+    
+    // Cálculo Dinámico de Alturas
+    const avgZ = getAverageZ(ring.points);
+    const altM = Math.abs(avgZ - minZ);
+    const altMm = Math.round(altM * 1000);
+    
+    // Porcentaje real y redondeo a intervalos de 10% (0%, 10%, 20%... 100%)
+    let rawPct = tankH > 0 ? (altM / tankH) * 100 : 0;
+    let pct = Math.round(rawPct / 10) * 10;
+    pct = Math.min(100, Math.max(0, pct)); // Limitar entre 0 y 100
+    
+    tbody += `<tr>
+      <td style="font-weight:bold; background:#f8fafc;">${ring.name}</td>
+      <td contenteditable="true" title="Click para editar">${pct}%</td>
+      <td contenteditable="true" title="Click para editar">${altMm}</td>`;
+      
+    dataResult.devs.forEach(d => {
+      if(d.missing) {
+        tbody += `<td>-</td>`;
+      } else {
+        const cls = getConditionClass(d.dev, tOk, tCrit);
+        tbody += `<td class="cell-data ${cls}">${d.dev}</td>`;
+      }
+    });
+    tbody += `</tr>`;
+  }
+
+  document.getElementById('matrix-oval-body').innerHTML = tbody;
+}
+
+function updateOvalLegendText() {
+  const tOk = document.getElementById('op-tok').value;
+  const tCrit = document.getElementById('op-crit').value;
+  
+  document.getElementById('leg-oval-ok').textContent = `0 a +/- ${tOk}mm`;
+  document.getElementById('leg-oval-warn').textContent = `+/- ${parseInt(tOk)+1}mm hasta +/- ${tCrit}mm`;
+  document.getElementById('leg-oval-crit').textContent = `+/- ${(parseFloat(tCrit)+0.01).toFixed(2)} mm a Mas`;
+}
+
+function csvOvalMatrix() {
+  if(!S.ovalRings.length) return;
+  const nEjes = +document.getElementById('op-ejes').value || 18;
+  const tankH = +document.getElementById('op-h').value || 3.0;
+
+  let csv = 'ANILLO,LECTURA %,ALTURA (mm),';
+  for(let i=0; i<nEjes; i++) csv += `EJE ${i+1} (${Math.round(i*360/nEjes)}°),`;
+  csv += '\n';
+
+  const minZ = S.ovalRings.length > 0 ? Math.min(...S.ovalRings.map(r => getAverageZ(r.points))) : 0;
+
+  for(let i = S.ovalRings.length - 1; i >= 0; i--) {
+    const ring = S.ovalRings[i];
+    const data = assignAxes(ring.points, nEjes);
+    const avgZ = getAverageZ(ring.points);
+    
+    const altM = Math.abs(avgZ - minZ);
+    const altMm = Math.round(altM * 1000);
+    
+    let rawPct = tankH > 0 ? (altM / tankH) * 100 : 0;
+    let pct = Math.round(rawPct / 10) * 10;
+    pct = Math.min(100, Math.max(0, pct));
+
+    csv += `${ring.name},${pct}%,${altMm},`;
+    data.devs.forEach(d => { csv += d.missing ? ',' : `${d.dev},`; });
+    csv += '\n';
+  }
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+  a.download = 'matriz_redondez_reporte.csv';
+  a.click();
+}
+
+
+/* ── TAB VERTICALIDAD: CALCULO CORREGIDO (PLUMADA EXACTA) ── */
+
+function handleVertFiles(inp) {
+  Array.from(inp.files).forEach(file => {
+    const rd = new FileReader();
+    rd.onload = e => {
+      const pts = parsePENZD(e.target.result);
+      if (!pts.length) return;
+      const num = S.vertRings.length + 1;
+      S.vertRings.push({ 
+        name: `ANILLO ${num}`, 
+        fileName: file.name.replace(/\.\w+$/, '').toUpperCase(),
+        points: pts 
+      });
+      updateVertAnalysis();
+    };
+    rd.readAsText(file);
+  });
+  inp.value = ''; 
+}
+
+function updateVertAnalysis() {
+  const el = document.getElementById('vert-files');
+  el.style.display = S.vertRings.length ? 'flex' : 'none';
+  el.innerHTML = S.vertRings.map((r, i) => `
+    <div class="fitem">
+      <input type="text" class="fn" value="${r.name}" onchange="renameVert(${i}, this.value)" title="Editar nombre del anillo">
+      <span class="f-info" title="${r.fileName}">${r.fileName} ${i===0 ? '<strong style="color:var(--accent); margin-left:8px;">[BASE]</strong>' : ''}</span>
+      <button class="fdel" onclick="removeVert(${i})">✕</button>
+    </div>`).join('');
+  
+  if (S.vertRings.length >= 2) {
+    document.getElementById('vert-results').style.display = 'block';
+    document.getElementById('vert-empty').style.display = 'none';
+    
+    drawVertChart();
+    buildVertMatrixTable();
+    updateVertLegendText();
+  } else {
+    document.getElementById('vert-results').style.display = 'none';
+    document.getElementById('vert-empty').style.display = 'flex';
+  }
+}
+
+function removeVert(i) {
+  S.vertRings.splice(i, 1);
+  updateVertAnalysis();
+}
+
+function renameVert(i, newName) {
+  if(newName.trim()) S.vertRings[i].name = newName.trim();
+  updateVertAnalysis();
+}
+
+function clearVert() {
+  S.vertRings = [];
+  updateVertAnalysis();
+}
+
+function calcVertDeviations() {
+  const nEjes = +document.getElementById('vp-ejes').value || 18;
+  if (S.vertRings.length < 1) return [];
+  
+  const baseRing = S.vertRings[0];
+  const baseData = assignAxes(baseRing.points, nEjes);
+  const cxBase = baseData.center.cx;
+  const cyBase = baseData.center.cy;
+  
+  return S.vertRings.slice(1).map(ring => {
+    const ringData = assignAxes(ring.points, nEjes, cxBase, cyBase); 
+    
+    const devs = [];
+    for(let i=0; i<nEjes; i++) {
+        const baseAxis = baseData.devs[i];
+        const ringAxis = ringData.devs[i];
+        
+        if (baseAxis.missing || ringAxis.missing) {
+            devs.push(null); 
+        } else {
+            const devMm = (ringAxis.dist - baseAxis.dist) * 1000;
+            devs.push(Math.round(devMm)); 
+        }
+    }
+    return { ring, devs };
+  });
+}
+
+function buildVertMatrixTable() {
+  const nEjes = +document.getElementById('vp-ejes').value || 18;
+  const tankH = +document.getElementById('vp-h').value || 3.0;
+  const tOk = +document.getElementById('vp-obs').value || 19;
+  const tCrit = +document.getElementById('vp-crit').value || 30;
+
+  let h1 = `<tr><th colspan="${3 + nEjes}" class="header-main">DESVIACIONES DE VERTICALIDAD - (mm)</th></tr>`;
+  let h2 = `<tr>
+      <th rowspan="2">ANILLO</th>
+      <th rowspan="2" style="width:70px;">LECTURA<br>% DE<br>ALTURA</th>
+      <th rowspan="2" style="width:70px;">ALTURA DE<br>TANQUE<br>(mm)</th>
+      <th colspan="${nEjes}">EJES DE MEDICIÓN</th>
+    </tr>`;
+  let h3 = `<tr>`;
+  for(let i=0; i<nEjes; i++) h3 += `<th>${i+1}<br><span style="font-weight:normal;">${Math.round(i*360/nEjes)}°</span></th>`;
+  h3 += `</tr>`;
+  
+  document.getElementById('matrix-vert-head').innerHTML = h1 + h2 + h3;
+
+  const vertData = calcVertDeviations();
+  
+  // En Verticalidad, el Anillo 1 cargado SIEMPRE es la base (Z de referencia)
+  const baseZ = S.vertRings.length > 0 ? getAverageZ(S.vertRings[0].points) : 0;
+
+  let tbody = '';
+  // Construir anillos superiores
+  for(let i = vertData.length - 1; i >= 0; i--) {
+    const d = vertData[i];
+    
+    // Cálculo real basado en las cotas (Z) del archivo topográfico
+    const avgZ = getAverageZ(d.ring.points);
+    const altM = Math.abs(avgZ - baseZ);
+    const altMm = Math.round(altM * 1000);
+    
+    // Porcentaje real y redondeo a intervalos de 10% (0%, 10%, 20%... 100%)
+    let rawPct = tankH > 0 ? (altM / tankH) * 100 : 0;
+    let pct = Math.round(rawPct / 10) * 10;
+    pct = Math.min(100, Math.max(0, pct));
+    
+    tbody += `<tr>
+      <td style="font-weight:bold; background:#f8fafc;">${d.ring.name}</td>
+      <td contenteditable="true" title="Click para editar">${pct}%</td>
+      <td contenteditable="true" title="Click para editar">${altMm}</td>`;
+      
+    d.devs.forEach(val => {
+      if (val === null) {
+          tbody += `<td style="color:#94a3b8;">-</td>`;
+      } else {
+          const cls = getConditionClass(val, tOk, tCrit);
+          // Insertamos un "+" explícito para valores positivos para facilitar la lectura
+          tbody += `<td class="cell-data ${cls}">${val > 0 ? '+' : ''}${val}</td>`;
+      }
+    });
+    tbody += `</tr>`;
+  }
+  
+  // Agregar fila base con Ceros (0) o vacíos si no hay lectura
+  const baseData = assignAxes(S.vertRings[0].points, nEjes);
+  tbody += `<tr>
+      <td style="font-weight:bold; background:#f8fafc;">${S.vertRings[0].name} (BASE)</td>
+      <td contenteditable="true">0%</td>
+      <td contenteditable="true">0</td>`;
+      
+  for(let i=0; i<nEjes; i++) {
+      if (baseData.devs[i].missing) {
+          tbody += `<td style="color:#94a3b8;">-</td>`;
+      } else {
+          tbody += `<td class="cell-data c-ok">0</td>`;
+      }
+  }
+  tbody += `</tr>`;
+
+  document.getElementById('matrix-vert-body').innerHTML = tbody;
+}
+
+function updateVertLegendText() {
+  const tOk = document.getElementById('vp-obs').value;
+  const tCrit = document.getElementById('vp-crit').value;
+  
+  document.getElementById('leg-vert-ok').textContent = `0 a +/- ${tOk}mm`;
+  document.getElementById('leg-vert-warn').textContent = `+/- ${parseInt(tOk)+1}mm hasta +/- ${tCrit}mm`;
+  document.getElementById('leg-vert-crit').textContent = `+/- ${(parseFloat(tCrit)+0.01).toFixed(2)} mm a Mas`;
+}
+
+function drawVertChart() {
+  if(S.charts['vertChart']) S.charts['vertChart'].destroy();
+  
+  const nEjes = +document.getElementById('vp-ejes').value || 18;
+  const tOk = +document.getElementById('vp-obs').value || 19;
+  const tCrit = +document.getElementById('vp-crit').value || 30;
+  
+  const labels = Array.from({length: nEjes}, (_, i) => `${i+1}`);
+  const vertData = calcVertDeviations();
+  
+  const datasets = vertData.map((d, i) => {
+    const color = COLORS[i % COLORS.length];
+    return {
+      label: `${d.ring.name}`, data: d.devs, borderColor: color, backgroundColor: 'transparent', borderWidth: 2,
+      pointStyle: 'rect', 
+      pointBackgroundColor: d.devs.map(v => {
+          if (v === null) return 'transparent';
+          const a = Math.abs(v);
+          return a > tCrit ? '#ef4444' : a > tOk ? '#f59e0b' : color;
+      }), 
+      pointRadius: 5, pointHoverRadius: 7, tension: 0.1,
+      spanGaps: true // Permite que el gráfico no se rompa visualmente si falta un punto intermedio
+    };
+  });
+  
+  const ctx = document.getElementById('cVertMain').getContext('2d');
+  
+  const horizontalLinePlugin = {
+    id: 'horizontalLines',
+    afterDraw: (chart) => {
+      const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+      const drawLine = (val, color, dash) => {
+        const yPos = y.getPixelForValue(val);
+        if (yPos > chart.chartArea.bottom || yPos < chart.chartArea.top) return;
+        ctx.save(); ctx.beginPath(); ctx.setLineDash(dash); ctx.moveTo(left, yPos); ctx.lineTo(right, yPos);
+        ctx.lineWidth = 1.5; ctx.strokeStyle = color; ctx.stroke(); ctx.restore();
+      };
+      drawLine(tCrit, '#ef4444', [4, 4]); drawLine(-tCrit, '#ef4444', [4, 4]);
+      drawLine(tOk, '#f59e0b', [4, 4]); drawLine(-tOk, '#f59e0b', [4, 4]);
+      drawLine(0, '#2563eb', [2, 2]);
+    }
+  };
+
+  S.charts['vertChart'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+      plugins: { legend: { position: 'top', labels: {font:{family:"Arial", size:12, weight:'bold'}, color:'#000', usePointStyle: true} } },
+      scales: {
+        x: { title: { display: true, text: 'EJES', font: { family: "Arial", size: 12, weight: 'bold' }, color: '#000' } },
+        y: { title: { display: true, text: 'DESPLAZAMIENTO HORIZONTAL (mm)', font: { family: "Arial", size: 12, weight: 'bold' }, color: '#000' } }
+      }
+    },
+    plugins: [horizontalLinePlugin]
+  });
+}
+
+function csvVertMatrix() {
+  if (S.vertRings.length < 2) return;
+  const nEjes = +document.getElementById('vp-ejes').value || 18;
+  const tankH = +document.getElementById('vp-h').value || 3.0;
+  
+  let csv = 'ANILLO,LECTURA %,ALTURA (mm),';
+  for(let i=0; i<nEjes; i++) csv += `EJE ${i+1} (${Math.round(i*360/nEjes)}°),`;
+  csv += '\n';
+
+  const vertData = calcVertDeviations();
+  const baseZ = S.vertRings.length > 0 ? getAverageZ(S.vertRings[0].points) : 0;
+
+  for(let i = vertData.length - 1; i >= 0; i--) {
+    const d = vertData[i];
+    
+    const avgZ = getAverageZ(d.ring.points);
+    const altM = Math.abs(avgZ - baseZ);
+    const altMm = Math.round(altM * 1000);
+    
+    let rawPct = tankH > 0 ? (altM / tankH) * 100 : 0;
+    let pct = Math.round(rawPct / 10) * 10;
+    pct = Math.min(100, Math.max(0, pct));
+
+    csv += `${d.ring.name},${pct}%,${altMm},`;
+    d.devs.forEach(val => { csv += `${val === null ? '' : val},`; });
+    csv += '\n';
+  }
+  
+  csv += `${S.vertRings[0].name},0%,0,`;
+  for(let i=0; i<nEjes; i++) csv += `0,`;
+  csv += '\n';
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+  a.download = 'matriz_verticalidad_reporte.csv';
+  a.click();
+}
+
+/* ── UTILIDADES GLOBALES ── */
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tb-' + t.slice(0,4)).classList.add('active');
+  document.getElementById('tab-' + t).classList.add('active');
+}
+
+async function dlChart(areaId, name) {
+  const el = document.getElementById(areaId);
+  if (!el) return;
+  
+  try {
+    const c = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    a.download = name + '.png';
+    a.click();
+  } catch(e) {
+    const canvas = el.querySelector('canvas');
+    if(canvas) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+      const tCtx = tempCanvas.getContext('2d');
+      tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+      tCtx.drawImage(canvas, 0, 0);
+      const a = document.createElement('a');
+      a.href = tempCanvas.toDataURL('image/png');
+      a.download = name + '.png';
+      a.click();
+    }
+  }
+}
+
+/* ── INIT Y DATOS DE PRUEBA REALES ── */
+document.addEventListener('DOMContentLoaded', () => {
+  ['oval', 'vert'].forEach(mod => {
+    const dropZone = document.getElementById(`${mod}-drop`);
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('drag');
+      if (e.dataTransfer.files.length) {
+        const inp = document.getElementById(`${mod}-input`);
+        inp.files = e.dataTransfer.files;
+        if(mod === 'oval') handleOvalFiles(inp); else handleVertFiles(inp);
+      }
+    });
+  });
+
+  cargarDataReal();
+});
+
+function cargarDataReal() {
+  const rawData = `145,100089.727,1000009.861,1013.621,H4,COMPLETADO
+146,100089.577,1000010.849,1013.621,H4,COMPLETADO
+147,100089.317,1000011.814,1013.621,H4,COMPLETADO
+148,100088.953,1000012.745,1013.621,H4,COMPLETADO
+149,100088.488,1000013.629,1013.621,H4,COMPLETADO
+150,100087.928,1000014.457,1013.621,H4,COMPLETADO
+151,100087.280,1000015.218,1013.621,H4,COMPLETADO
+116,100087.148,1000015.299,1013.635,H4,ORIGINAL
+152,100086.436,1000015.998,1013.621,H4,COMPLETADO
+117,100085.770,1000016.472,1013.644,H4,ORIGINAL
+153,100084.919,1000016.995,1013.621,H4,COMPLETADO
+154,100084.009,1000017.408,1013.621,H4,COMPLETADO
+90,100083.694,1000017.522,1013.686,H4,ORIGINAL
+118,100083.574,1000017.552,1013.661,H4,ORIGINAL
+155,100082.613,1000017.823,1013.621,H4,COMPLETADO
+91,100082.000,1000017.918,1013.626,H4,ORIGINAL
+156,100081.006,1000018.015,1013.621,H4,COMPLETADO
+92,100080.423,1000018.005,1013.612,H4,ORIGINAL
+157,100079.427,1000017.922,1013.621,H4,COMPLETADO
+93,100078.532,1000017.743,1013.571,H4,ORIGINAL
+158,100077.578,1000017.445,1013.621,H4,COMPLETADO
+94,100077.533,1000017.431,1013.602,H4,ORIGINAL
+95,100076.735,1000017.087,1013.621,H4,ORIGINAL
+56,100076.348,1000016.888,1013.664,H4,ORIGINAL
+96,100075.801,1000016.562,1013.631,H4,ORIGINAL
+55,100075.555,1000016.397,1013.661,H4,ORIGINAL
+54,100074.981,1000015.961,1013.660,H4,ORIGINAL
+97,100074.720,1000015.735,1013.612,H4,ORIGINAL
+53,100074.293,1000015.326,1013.653,H4,ORIGINAL
+98,100073.927,1000014.930,1013.604,H4,ORIGINAL
+52,100073.637,1000014.581,1013.658,H4,ORIGINAL
+1,100073.269,1000014.065,1013.650,H4,ORIGINAL
+99,100073.153,1000013.896,1013.593,H4,ORIGINAL
+51,100072.899,1000013.476,1013.659,H4,ORIGINAL
+159,100072.462,1000012.576,1013.621,H4,COMPLETADO
+100,100072.458,1000012.576,1013.601,H4,ORIGINAL
+2,100072.438,1000012.518,1013.639,H4,ORIGINAL
+160,100072.099,1000011.578,1013.621,H4,COMPLETADO
+35,100072.037,1000011.334,1013.637,H4,ORIGINAL
+101,100071.991,1000011.171,1013.580,H4,ORIGINAL
+161,100071.800,1000010.190,1013.621,H4,COMPLETADO
+3,100071.809,1000010.158,1013.634,H4,ORIGINAL
+102,100071.775,1000009.895,1013.607,H4,ORIGINAL
+34,100071.738,1000009.133,1013.617,H4,ORIGINAL
+162,100071.762,1000008.135,1013.621,H4,COMPLETADO
+103,100071.799,1000007.971,1013.617,H4,ORIGINAL
+4,100071.844,1000007.674,1013.636,H4,ORIGINAL
+163,100072.020,1000006.691,1013.621,H4,COMPLETADO
+104,100072.066,1000006.616,1013.584,H4,ORIGINAL
+5,100072.145,1000006.343,1013.627,H4,ORIGINAL
+6,100072.435,1000005.527,1013.627,H4,ORIGINAL
+164,100072.852,1000004.620,1013.621,H4,COMPLETADO
+7,100073.280,1000003.936,1013.616,H4,ORIGINAL
+165,100073.880,1000003.137,1013.621,H4,COMPLETADO
+8,100074.440,1000002.533,1013.589,H4,ORIGINAL
+166,100075.196,1000001.878,1013.621,H4,COMPLETADO
+9,100075.510,1000001.632,1013.599,H4,ORIGINAL
+167,100076.361,1000001.107,1013.621,H4,COMPLETADO
+10,100076.680,1000000.930,1013.578,H4,ORIGINAL
+168,100077.599,1000000.536,1013.621,H4,COMPLETADO
+11,100077.930,1000000.414,1013.601,H4,ORIGINAL
+169,100078.897,1000000.162,1013.621,H4,COMPLETADO
+12,100079.351,1000000.069,1013.604,H4,ORIGINAL
+170,100080.347,999999.979,1013.621,H4,COMPLETADO
+13,100080.801,999999.956,1013.609,H4,ORIGINAL
+171,100081.799,1000000.032,1013.621,H4,COMPLETADO
+14,100082.315,1000000.094,1013.611,H4,ORIGINAL
+172,100083.286,1000000.335,1013.621,H4,COMPLETADO
+15,100084.142,1000000.622,1013.609,H4,ORIGINAL
+16,100084.883,1000000.968,1013.617,H4,ORIGINAL
+17,100085.529,1000001.343,1013.578,H4,ORIGINAL
+173,100086.346,1000001.919,1013.621,H4,COMPLETADO
+174,100087.094,1000002.582,1013.621,H4,COMPLETADO
+175,100087.764,1000003.323,1013.621,H4,COMPLETADO
+176,100088.348,1000004.134,1013.621,H4,COMPLETADO
+177,100088.839,1000005.005,1013.621,H4,COMPLETADO
+178,100089.231,1000005.924,1013.621,H4,COMPLETADO
+179,100089.518,1000006.882,1013.621,H4,COMPLETADO
+180,100089.698,1000007.865,1013.621,H4,COMPLETADO
+181,100089.768,1000008.862,1013.621,H4,COMPLETADO`;
+
+  const pts = parsePENZD(rawData);
+  S.ovalRings.push({ name: 'ANILLO 1', fileName: 'TANK_01', points: pts });
+  
+  // Simulamos datos inclinando la malla y asignando cotas (Z) reales
+  const hStep = 3.0 / 4; // 0.75m por anillo para el demo
+  const pts2 = pts.map(p => ({ ...p, x: p.x + 0.015, y: p.y - 0.005, z: p.z + hStep * 1 })); 
+  const pts3 = pts.map(p => ({ ...p, x: p.x - 0.025, y: p.y + 0.012, z: p.z + hStep * 2 })); 
+  const pts4 = pts.map(p => ({ ...p, x: p.x + 0.035, y: p.y + 0.005, z: p.z + hStep * 3 })); 
+  const pts5 = pts.map(p => ({ ...p, x: p.x - 0.010, y: p.y - 0.012, z: p.z + hStep * 4 })); 
+  
+  S.ovalRings.push({ name: 'ANILLO 2', fileName: 'TANK_02', points: pts2 });
+  S.ovalRings.push({ name: 'ANILLO 3', fileName: 'TANK_03', points: pts3 });
+  S.ovalRings.push({ name: 'ANILLO 4', fileName: 'TANK_04', points: pts4 });
+  S.ovalRings.push({ name: 'ANILLO 5', fileName: 'TANK_05', points: pts5 });
+  
+  S.vertRings.push({ name: 'ANILLO 1', fileName: 'TANK_01', points: pts });
+  S.vertRings.push({ name: 'ANILLO 2', fileName: 'TANK_02', points: pts2 });
+  S.vertRings.push({ name: 'ANILLO 3', fileName: 'TANK_03', points: pts3 });
+  S.vertRings.push({ name: 'ANILLO 4', fileName: 'TANK_04', points: pts4 });
+  S.vertRings.push({ name: 'ANILLO 5', fileName: 'TANK_05', points: pts5 });
+
+  updateOvalAnalysis();
+  updateVertAnalysis();
+}
+
+</script>
+</body>
+</html>
