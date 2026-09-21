@@ -111,10 +111,21 @@ export const CONFIG = {
     regions: 'eu',
     markets: 'h2h,totals',
     onlyLeaguesWithFixtures: true,
-    // Horizonte de partidos para los que se piden cuotas.
-    hoursAhead: 48,
+    /**
+     * Horizonte para pedir cuotas, en horas. Es deliberadamente más corto que
+     * el horizonte de partidos publicados: las casas abren mercados con pocos
+     * días de antelación y cada liga consultada gasta crédito.
+     *
+     * Si no hay ningún partido dentro del horizonte (un parón de selecciones),
+     * se piden las cuotas de la PRÓXIMA jornada con partidos, para no dejar la
+     * sección de valor muerta dos semanas. Como sólo juegan una o dos ligas ese
+     * día, el gasto es mínimo.
+     */
+    hoursAhead: 72,
     // El refresco prepartido mira sólo lo inminente.
-    prematchHoursAhead: 8,
+    prematchHoursAhead: 4,
+    /** Crédito que se reserva: por debajo de esto no se piden cuotas. */
+    minCreditsReserve: 40,
   },
 
   /**
