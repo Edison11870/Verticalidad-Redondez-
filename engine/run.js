@@ -328,32 +328,58 @@ async function loadFixtures({ keys, now, budget, prematch, provider }) {
   return fixtures;
 }
 
-/** Cuotas sólo de las ligas que tienen partidos próximos: cada liga cuesta crédito. */
+/**
+ * Cuotas sólo de las ligas que juegan pronto: cada liga consultada gasta
+ * crédito, y pedir las diecisiete en cada actualización agota un plan
+ * gratuito en pocos días.
+ */
 async function loadOdds({ keys, fixtures, now, budget, prematch = false }) {
   if (!keys.odds) return { events: [], credits: null };
 
   let leagues = LEAGUES.filter((l) => l.oddsKey);
   if (CONFIG.odds.onlyLeaguesWithFixtures) {
-    // El refresco prepartido sólo mira lo que empieza pronto: menos ligas,
-    // menos crédito gastado.
     const hours = prematch ? CONFIG.odds.prematchHoursAhead : CONFIG.odds.hoursAhead;
     const horizon = now.getTime() + hours * 3600 * 1000;
-    const active = new Set(
+    let active = new Set(
       fixtures.filter((f) => f.date.getTime() <= horizon).map((f) => f.leagueId),
     );
-    leagues = leagues.filter((l) => active.has(l.id));
-    log(`Cuotas: ${leagues.length} ligas con partidos en las próximas ${hours} h`);
-  }
-  if (!leagues.length) return { events: [], credits: null };
 
-  return fetchOdds(keys.odds, {
+    // Parón: no hay nada dentro del horizonte. Se toman las ligas del primer
+    // día con partidos, para que la sección de valor no quede muerta dos
+    // semanas. Como ese día suele jugar una sola liga, el gasto es mínimo.
+    if (!active.size && fixtures.length) {
+      const nextDay = fixtures.map((f) => dayKey(f.date)).sort()[0];
+      active = new Set(
+        fixtures.filter((f) => dayKey(f.date) === nextDay).map((f) => f.leagueId),
+      );
+      log(`Cuotas: sin partidos en ${hours} h; se consulta la próxima jornada (${nextDay})`);
+    }
+
+    leagues = leagues.filter((l) => active.has(l.id));
+    log(`Cuotas: ${leagues.length} ligas a consultar`);
+  }
+  if (!leagues.length) {
+    log('Cuotas: ninguna liga con partidos próximos publica cuotas en este proveedor.');
+    return { events: [], credits: null };
+  }
+
+  const result = await fetchOdds(keys.odds, {
     leagues,
     regions: CONFIG.odds.regions,
     markets: CONFIG.odds.markets,
     budget,
     onProgress: (m) => log(' ', m),
   });
+
+  const remaining = result.credits?.remaining;
+  if (remaining !== null && remaining !== undefined && remaining < CONFIG.odds.minCreditsReserve) {
+    log(
+      `Aviso: quedan ${remaining} créditos de cuotas. Por debajo de ${CONFIG.odds.minCreditsReserve} conviene espaciar las actualizaciones o ampliar el plan.`,
+    );
+  }
+  return result;
 }
+
 
 /* ----------------------------- liquidación --------------------------- */
 
