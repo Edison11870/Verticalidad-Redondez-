@@ -92,7 +92,10 @@ export const CONFIG = {
    * una petición más, y evita que la web se quede vacía en un parón.
    */
   fixtures: {
-    horizonDays: 16,
+    // 24 días cubren el parón de selecciones más largo y dejan dentro la
+    // vuelta de las ligas europeas y la Champions. Fuera de los parones,
+    // equivale a unas tres jornadas por delante.
+    horizonDays: 24,
   },
 
   /**
