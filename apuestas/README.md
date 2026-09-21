@@ -14,18 +14,19 @@ https://<usuario>.github.io/Verticalidad-Redondez-/apuestas/
 
 ## Puesta en marcha
 
+**Sin claves no se publica nada inventado.** La web muestra una pantalla de
+configuración pendiente con los pasos a seguir. El modo demostración existe
+sólo para desarrollo y hay que pedirlo explícitamente con `--demo`.
+
 ```bash
 npm test                 # comprueba el motor (16 pruebas)
-npm run demo             # genera datos simulados y llena la web
+npm run check            # valida las claves y la cuota que queda
+npm run update           # actualización real (requiere claves)
 npm run serve            # sirve en http://localhost:8080/apuestas/
+npm run demo             # datos simulados, sólo para desarrollo
 ```
 
-Sin claves de API el sistema arranca en **modo demostración**: simula dos
-temporadas de resultados y un mercado de cuotas, y ejecuta con ellos exactamente
-el mismo modelo, backtesting y constructor de combinadas que en producción. La
-web avisa de ello en todas las vistas.
-
-### Con datos reales
+### Las claves
 
 | Variable | Proveedor | Para qué |
 |---|---|---|
@@ -40,16 +41,61 @@ npm run update           # actualización diaria completa
 npm run prematch         # refresco de cuotas y alineaciones antes de los partidos
 ```
 
-Sin `ODDS_API_KEY` el sistema sigue calculando probabilidades, pero no puede
-detectar valor: sin cuota no hay con qué comparar.
+Sin `ODDS_API_KEY` el sistema sigue calculando probabilidades reales, pero no
+puede detectar valor: sin cuota no hay con qué comparar. La web lo dice en vez
+de dejar la sección vacía.
 
-### Actualización automática
+Comprueba en cualquier momento qué claves funcionan y cuánta cuota queda:
 
-`.github/workflows/actualizar-apuestas.yml` hace una pasada completa a las 06:20
-UTC y refrescos prepartido a las 11:00, 15:00 y 18:00 UTC; después publica los
-JSON actualizados en el repositorio. Guarda las claves en *Settings → Secrets and
-variables → Actions*. El flujo usa `--strict`: si faltan las claves, falla en vez
-de sustituir los datos reales por una demostración.
+```bash
+npm run check
+```
+
+## Consumo de las APIs
+
+Los planes gratuitos son pequeños, así que el sistema está escrito para gastar
+poco. Tres decisiones concretas:
+
+- **El histórico se descarga una vez.** La primera ejecución cuesta ~40
+  peticiones (20 ligas × 2 temporadas) y se guarda en
+  `apuestas/data/historial-partidos.json`. Las siguientes sólo piden los días
+  nuevos, y `/fixtures?date=…` trae todas las ligas en **una** petición.
+- **Las bajas y las cuotas sólo se piden para las ligas que juegan.** Consultar
+  las 20 ligas cada vez era el mayor gasto recurrente.
+- **The Odds API cobra una petición por cada combinación de región y mercado.**
+  Pedir `eu,uk,us` con `h2h,totals,spreads` cuesta **9 créditos por liga y por
+  ejecución**: agota el plan gratuito de 500 al mes en tres días. Por defecto se
+  pide una región y dos mercados: 2 créditos por liga.
+
+Coste aproximado con la configuración por defecto:
+
+| | API-Football (100/día gratis) | The Odds API (500/mes gratis) |
+|---|---|---|
+| Primera ejecución | ~62 peticiones | ~12 créditos |
+| Actualización diaria | ~11 peticiones | ~12 créditos |
+| Refresco prepartido | ~13 peticiones | ~6 créditos |
+
+Con las dos pasadas diarias salen unos 540 créditos de cuotas al mes: justo por
+encima del plan gratuito. Si quieres quedarte dentro, deja sólo la pasada
+diaria borrando el segundo `cron` del flujo de trabajo; si prefieres las dos,
+el plan de pago más barato de The Odds API cubre de sobra.
+
+Ajusta regiones, mercados y horizontes en `CONFIG.odds` (`engine/config.js`).
+
+## Actualización automática
+
+`.github/workflows/actualizar-apuestas.yml` se dispara al fusionar en `main`
+(para que la primera publicación real no espere), a las 06:20 UTC (pasada
+completa) y a las 16:00 UTC (refresco prepartido). Después publica los JSON
+actualizados en el repositorio.
+
+Guarda las claves en *Settings → Secrets and variables → Actions*. El flujo
+valida las claves antes de usarlas: si una existe pero no sirve, falla y se ve;
+si no hay ninguna, no publica nada y lo explica en el resumen de la ejecución.
+
+Desde *Actions → Actualizar apuestas → Run workflow* puedes lanzar a mano
+`diaria`, `prepartido`, `comprobar-claves` (sólo valida, no publica) o
+`recargar-historico` (fuerza la descarga completa del histórico).
 
 ## Cómo se calcula
 
@@ -98,11 +144,12 @@ usaran las mismas reglas, el ROI medido no significaría nada.
 En la demo, el historial publicado procede del backtesting y sus métricas
 cuadran con las de la pestaña *Modelo* — si no cuadran, hay un error.
 
-> **Sobre el mercado simulado de la demo.** La casa simulada no conoce las
-> fuerzas verdaderas: las estima con error, como una casa real, y aplica el
-> sesgo favorito-outsider documentado en la literatura. Si cotizara con la
-> verdad exacta sería un oráculo y ningún modelo podría encontrar valor jamás:
-> el backtesting sólo mediría el margen de la casa.
+> **Sobre el modo demostración.** Sólo se usa en desarrollo, nunca se publica
+> por defecto y la web lo marca en todas las vistas cuando está activo. La casa
+> simulada no conoce las fuerzas verdaderas: las estima con error, como una casa
+> real, y aplica el sesgo favorito-outsider documentado en la literatura. Si
+> cotizara con la verdad exacta sería un oráculo y ningún modelo podría
+> encontrar valor jamás: el backtesting sólo mediría el margen de la casa.
 
 ## Estructura
 
@@ -111,7 +158,8 @@ apuestas/
   index.html            vistas Hoy · Mañana · Combinadas · Historial · Modelo
   assets/css/styles.css mobile-first, modo oscuro por defecto
   assets/js/app.js      render y gráficos SVG, sin dependencias
-  data/                 latest.json · history.json · backtest.json (los genera el motor)
+  data/                 latest.json · history.json · backtest.json
+                        historial-partidos.json (caché del histórico)
 engine/
   run.js                actualización diaria / prepartido
   pipeline.js           de los datos crudos al JSON de la web

@@ -97,14 +97,55 @@ export async function fetchHistory(apiKey, { leagues = LEAGUES, seasons = 2, bud
   return out;
 }
 
-/** Partidos programados para una fecha (YYYY-MM-DD, UTC). */
-export async function fetchFixturesByDate(apiKey, date, { leagues = LEAGUES, budget } = {}) {
+/**
+ * Partidos de una fecha (YYYY-MM-DD, UTC). Una sola petición cubre TODAS las
+ * ligas, así que es la forma barata de mantener el histórico al día.
+ *
+ * @param {object} options
+ *   includeFinished  true devuelve también los ya jugados (para resultados)
+ *   onlyPending      true devuelve sólo los que no han terminado (por defecto)
+ */
+export async function fetchFixturesByDate(
+  apiKey,
+  date,
+  { leagues = LEAGUES, budget, includeFinished = false, onlyPending = true } = {},
+) {
   const ids = new Set(leagues.map((l) => l.apiFootballId).filter(Boolean));
   const response = await call(apiKey, '/fixtures', { date, timezone: 'UTC' }, budget);
   return response
     .map(mapFixture)
-    .filter((f) => ids.has(f.leagueProviderId))
-    .filter((f) => !f.finished && f.home && f.away);
+    .filter((f) => ids.has(f.leagueProviderId) && f.home && f.away)
+    .filter((f) => {
+      if (includeFinished && !onlyPending) return true;
+      if (includeFinished) return true;
+      return !f.finished;
+    });
+}
+
+/** Resultados ya jugados de una fecha, en el formato que consume el modelo. */
+export async function fetchResultsByDate(apiKey, date, { leagues = LEAGUES, budget } = {}) {
+  const list = await fetchFixturesByDate(apiKey, date, {
+    leagues,
+    budget,
+    includeFinished: true,
+    onlyPending: false,
+  });
+  return list.filter((f) => f.finished && f.homeGoals !== null && f.awayGoals !== null);
+}
+
+/** Comprueba que la clave es válida y cuánta cuota queda hoy. */
+export async function checkKey(apiKey) {
+  const url = new URL(`${BASE}/status`);
+  const data = await getJson(url.toString(), { headers: headers(apiKey) });
+  const account = data?.response;
+  if (!account) throw new Error('Respuesta inesperada de API-Football');
+  return {
+    ok: true,
+    plan: account.subscription?.plan ?? 'desconocido',
+    active: account.subscription?.active ?? false,
+    used: account.requests?.current ?? 0,
+    limit: account.requests?.limit_day ?? 0,
+  };
 }
 
 /**

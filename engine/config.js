@@ -73,6 +73,37 @@ export const CONFIG = {
     marketPrior: 0.4,
   },
   markets: ['1x2', 'dc', 'ou', 'btts', 'ah'],
+
+  /**
+   * Consumo de las APIs. Los planes gratuitos son pequeños y The Odds API
+   * cobra UNA petición por cada combinación de región y mercado: pedir
+   * `eu,uk,us` con `h2h,totals,spreads` cuesta 9 créditos por liga y por
+   * ejecución, que agota el plan gratuito (500 al mes) en tres días.
+   *
+   * Por defecto se pide una sola región y dos mercados (2 créditos por liga)
+   * y sólo para las ligas que tienen partidos en las próximas horas.
+   */
+  odds: {
+    regions: 'eu',
+    markets: 'h2h,totals',
+    onlyLeaguesWithFixtures: true,
+    // Horizonte de partidos para los que se piden cuotas.
+    hoursAhead: 48,
+    // El refresco prepartido mira sólo lo inminente.
+    prematchHoursAhead: 8,
+  },
+
+  /**
+   * El histórico se descarga una vez y después sólo se piden los resultados
+   * nuevos. Sin esta caché, cada actualización gastaría 40 peticiones de
+   * API-Football (20 ligas x 2 temporadas) y el plan gratuito de 100 al día
+   * no daría para nada más.
+   */
+  cache: {
+    historyFile: 'apuestas/data/historial-partidos.json',
+    refreshDays: 12,
+    maxAgeDays: 900,
+  },
 };
 
 export function leagueById(id) {

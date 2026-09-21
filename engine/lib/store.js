@@ -208,3 +208,76 @@ export function summarizeHistory(entries = []) {
     daily: bankrollCurve,
   };
 }
+
+
+/**
+ * Caché del histórico de partidos.
+ *
+ * Descargar dos temporadas de 20 ligas cuesta 40 peticiones. Repetirlo en cada
+ * actualización agotaría el plan gratuito de API-Football (100 al día) sin
+ * dejar margen para los partidos del día. Con la caché, el arranque cuesta esas
+ * 40 peticiones una sola vez y cada actualización posterior cuesta UNA por
+ * cada día transcurrido, porque /fixtures?date=... trae todas las ligas juntas.
+ */
+export async function readHistoryCache(path) {
+  const cache = await readJson(path, null);
+  if (!cache?.matches?.length) return { matches: [], updatedAt: null, seasons: null };
+  return {
+    matches: cache.matches.map((m) => ({ ...m, date: new Date(m.date) })),
+    updatedAt: cache.updatedAt ? new Date(cache.updatedAt) : null,
+    seasons: cache.seasons ?? null,
+    source: cache.source ?? null,
+  };
+}
+
+export async function writeHistoryCache(path, matches, meta = {}) {
+  const ordered = [...matches].sort((a, b) => a.date - b.date);
+  await writeJson(
+    path,
+    {
+      updatedAt: new Date().toISOString(),
+      count: ordered.length,
+      ...meta,
+      matches: ordered.map((m) => ({
+        id: m.id,
+        date: m.date instanceof Date ? m.date.toISOString() : m.date,
+        league: m.league,
+        leagueId: m.leagueId,
+        leagueGroup: m.leagueGroup,
+        home: m.home,
+        away: m.away,
+        homeGoals: m.homeGoals,
+        awayGoals: m.awayGoals,
+        xgHome: m.xgHome ?? null,
+        xgAway: m.xgAway ?? null,
+        neutral: Boolean(m.neutral),
+      })),
+    },
+    { decimals: 2 },
+  );
+}
+
+/** Une partidos por id, se queda con la versión más reciente y poda los viejos. */
+export function mergeMatches(existing = [], incoming = [], maxAgeDays = 900) {
+  const byId = new Map();
+  for (const match of [...existing, ...incoming]) {
+    if (!match?.id || match.homeGoals === null || match.homeGoals === undefined) continue;
+    byId.set(match.id, { ...match, date: new Date(match.date) });
+  }
+  const cutoff = Date.now() - maxAgeDays * 86400000;
+  return [...byId.values()]
+    .filter((m) => m.date.getTime() >= cutoff)
+    .sort((a, b) => a.date - b.date);
+}
+
+/** Fechas (YYYY-MM-DD) entre dos momentos, ambas incluidas. */
+export function datesBetween(from, to) {
+  const out = [];
+  const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
+  while (cursor <= end) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}

@@ -105,6 +105,10 @@ async function boot() {
     state.report = report;
     state.history = history;
     state.backtest = backtest;
+    if (report.configured === false) {
+      renderSetup(report);
+      return;
+    }
     renderAll();
   } catch (error) {
     $('#update-line').textContent = 'No se pudieron cargar los datos';
@@ -115,6 +119,35 @@ async function boot() {
       }),
     );
   }
+}
+
+/** Estado "faltan claves": la página lo dice y explica qué hacer. */
+function renderSetup(report) {
+  $('#update-line').textContent = 'Pendiente de configurar';
+  document.querySelector('.tabs').hidden = true;
+  for (const id of ['view-dia', 'view-combinadas', 'view-historial', 'view-modelo']) {
+    const node = document.getElementById(id);
+    if (node) node.hidden = true;
+  }
+  $('#view-setup').hidden = false;
+
+  $('#setup-keys').replaceChildren(
+    ...(report.missingKeys ?? []).map((key) =>
+      el('article', { class: 'pick' }, [
+        el('div', { class: 'pick-bet' }, [
+          el('div', {}, [
+            el('div', { class: 'pick-market', text: 'Secreto de repositorio' }),
+            el('div', { class: 'pick-label', text: key.key }),
+          ]),
+          el('a', { class: 'chip', href: key.url, rel: 'noopener', target: '_blank', text: key.name }),
+        ]),
+        el('p', { class: 'summary-line', text: key.what }),
+        key.alternative ? el('p', { class: 'muted', text: `Alternativa: ${key.alternative}` }) : null,
+      ]),
+    ),
+  );
+
+  $('#sources-line').textContent = report.disclaimer ?? '';
 }
 
 /* ------------------------------- chrome ------------------------------- */
@@ -197,9 +230,8 @@ function renderAll() {
     minute: '2-digit',
   })} · ${report.matches.length} partidos`;
 
-  if (report.demo) {
-    $('#demo-banner').hidden = false;
-  }
+  $('#demo-banner').hidden = !report.demo;
+  $('#odds-banner').hidden = report.demo || report.hasOdds !== false;
   $('#sources-line').textContent = `Fuentes: ${(report.dataSources ?? []).join(' · ')}. ${
     report.disclaimer ?? ''
   }`;
@@ -298,7 +330,10 @@ function renderDay() {
     list.replaceChildren(
       el('p', {
         class: 'empty',
-        text: 'Ninguna selección supera el umbral de valor con estos filtros. No apostar también es una decisión.',
+        text:
+          state.report.hasOdds === false
+            ? 'Sin clave de cuotas no hay con qué comparar las probabilidades, así que no se puede publicar ninguna apuesta de valor. Las predicciones de cada partido sí son reales: están más abajo.'
+            : 'Ninguna selección supera el umbral de valor con estos filtros. No apostar también es una decisión.',
       }),
     );
   } else {

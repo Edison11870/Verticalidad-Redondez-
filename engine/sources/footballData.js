@@ -83,3 +83,9 @@ export async function fetchFixturesByDate(apiKey, date, { budget } = {}) {
 }
 
 export { mapMatch };
+
+/** Comprueba que la clave es válida. */
+export async function checkKey(apiKey) {
+  const data = await call(apiKey, '/competitions', {});
+  return { ok: true, competitions: data?.count ?? (data?.competitions?.length ?? 0) };
+}

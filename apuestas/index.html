@@ -31,7 +31,14 @@
   <div class="wrap" id="demo-banner" hidden>
     <p class="banner banner-warn">
       <strong>Datos de demostración.</strong>
-      <span id="demo-text">No hay claves de API configuradas: los partidos, resultados y cuotas están simulados. El modelo, el backtesting y las combinadas funcionan igual que en producción.</span>
+      <span id="demo-text">Estos partidos y cuotas están simulados; no son reales. El modo demostración sólo se usa en desarrollo.</span>
+    </p>
+  </div>
+
+  <div class="wrap" id="odds-banner" hidden>
+    <p class="banner banner-warn">
+      <strong>Sin cuotas.</strong>
+      <span>No hay clave de cuotas configurada, así que las probabilidades son reales pero no hay con qué compararlas: no se puede detectar valor ni armar combinadas. Añade <code>ODDS_API_KEY</code> para activarlo.</span>
     </p>
   </div>
 
@@ -47,6 +54,25 @@
 </header>
 
 <main id="contenido" class="wrap">
+
+  <!-- ====== CONFIGURACIÓN PENDIENTE ====== -->
+  <section class="view" id="view-setup" hidden>
+    <div class="day-head">
+      <h2>Falta configurar las claves de datos</h2>
+      <p class="muted">La página no muestra nada inventado. Para ver partidos reales hace falta conectar las fuentes de datos; son dos claves y se configuran una sola vez.</p>
+    </div>
+    <div id="setup-keys"></div>
+    <section class="block prose">
+      <h3>Cómo activarlo</h3>
+      <ol>
+        <li>Crea una cuenta en cada proveedor de la lista y copia su clave (<em>API key</em>).</li>
+        <li>En este repositorio, entra en <strong>Settings → Secrets and variables → Actions → New repository secret</strong>.</li>
+        <li>Crea un secreto por clave, con exactamente el nombre indicado arriba.</li>
+        <li>Ve a <strong>Actions → Actualizar apuestas → Run workflow</strong> y elige <code>diaria</code>. En unos minutos esta página se llena con los partidos reales del día.</li>
+      </ol>
+      <p class="muted">A partir de ahí se actualiza sola: una pasada completa al día y un refresco antes de los partidos.</p>
+    </section>
+  </section>
 
   <!-- ====== HOY / MAÑANA ====== -->
   <section class="view" id="view-dia" aria-live="polite">

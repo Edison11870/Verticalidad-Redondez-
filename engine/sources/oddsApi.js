@@ -7,19 +7,30 @@
  * disponible (la que maximiza el valor) y el consenso para quitar el margen.
  */
 
-import { getJson, sleep } from './http.js';
+import { getJsonWithHeaders, sleep } from './http.js';
 import { LEAGUES } from '../config.js';
 
 const BASE = 'https://api.the-odds-api.com/v4';
 
+/**
+ * @param {object} options
+ *   leagues  ligas a consultar (filtrar a las que tienen partidos ahorra crédito)
+ *   regions  UNA región por defecto: cada región extra multiplica el coste
+ *   markets  cada mercado extra también multiplica el coste
+ * @returns {Promise<{events:Array, credits:{used:number, remaining:number|null}}>}
+ */
 export async function fetchOdds(apiKey, {
   leagues = LEAGUES,
-  regions = 'eu,uk,us',
-  markets = 'h2h,totals,spreads',
+  regions = 'eu',
+  markets = 'h2h,totals',
   budget,
   onProgress,
 } = {}) {
   const events = [];
+  const creditsPerCall = regions.split(',').length * markets.split(',').length;
+  let creditsUsed = 0;
+  let creditsRemaining = null;
+
   for (const league of leagues) {
     if (!league.oddsKey) continue;
     if (budget && !budget.consume()) break;
@@ -30,17 +41,38 @@ export async function fetchOdds(apiKey, {
     url.searchParams.set('oddsFormat', 'decimal');
     url.searchParams.set('dateFormat', 'iso');
     try {
-      const data = await getJson(url.toString());
+      const { data, headers } = await getJsonWithHeaders(url.toString());
       for (const event of data ?? []) {
         events.push(normalizeEvent(event, league));
       }
+      creditsUsed += creditsPerCall;
+      const remaining = headers.get('x-requests-remaining');
+      if (remaining !== null) creditsRemaining = Number(remaining);
       onProgress?.(`${league.name}: ${data?.length ?? 0} eventos con cuotas`);
     } catch (error) {
       onProgress?.(`${league.name}: sin cuotas (${error.message})`);
     }
     await sleep(200);
   }
-  return events;
+
+  onProgress?.(
+    `Cuotas: ${events.length} eventos · ${creditsUsed} créditos gastados` +
+      (creditsRemaining === null ? '' : ` · quedan ${creditsRemaining} este mes`),
+  );
+  return { events, credits: { used: creditsUsed, remaining: creditsRemaining } };
+}
+
+/** Comprueba que la clave es válida sin gastar créditos de cuotas. */
+export async function checkOddsKey(apiKey) {
+  const url = new URL(`${BASE}/sports/`);
+  url.searchParams.set('apiKey', apiKey);
+  const { data, headers } = await getJsonWithHeaders(url.toString());
+  return {
+    ok: Array.isArray(data),
+    sports: Array.isArray(data) ? data.length : 0,
+    remaining: Number(headers.get('x-requests-remaining') ?? 0),
+    used: Number(headers.get('x-requests-used') ?? 0),
+  };
 }
 
 function normalizeEvent(event, league) {

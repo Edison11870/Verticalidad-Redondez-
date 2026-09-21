@@ -19,7 +19,17 @@ export class RequestBudget {
   }
 }
 
-export async function getJson(url, { headers = {}, retries = 3, timeout = DEFAULT_TIMEOUT } = {}) {
+export async function getJson(url, options = {}) {
+  const { data } = await getJsonWithHeaders(url, options);
+  return data;
+}
+
+/**
+ * Igual que getJson pero devuelve también las cabeceras: The Odds API informa
+ * del crédito restante en `x-requests-remaining`, y sin leerlo no hay forma de
+ * saber cuánto queda del plan hasta que deja de responder.
+ */
+export async function getJsonWithHeaders(url, { headers = {}, retries = 3, timeout = DEFAULT_TIMEOUT } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     const controller = new AbortController();
@@ -36,7 +46,7 @@ export async function getJson(url, { headers = {}, retries = 3, timeout = DEFAUL
         const body = await res.text().catch(() => '');
         throw new Error(`HTTP ${res.status} en ${safeUrl(url)}: ${body.slice(0, 200)}`);
       }
-      return await res.json();
+      return { data: await res.json(), headers: res.headers };
     } catch (error) {
       clearTimeout(timer);
       lastError = error;
