@@ -99,28 +99,61 @@ export async function fetchHistory(apiKey, { leagues = LEAGUES, seasons = 2, bud
 }
 
 /**
- * Partidos de una fecha. Se usa el rango dateFrom/dateTo en vez de `date`:
- * la documentación sólo garantiza el rango (y atajos como TODAY), y el
- * extremo dateTo puede ser exclusivo, así que se pide un día de más y se
- * filtra aquí por el día exacto.
+ * Partidos de un rango de fechas.
+ *
+ * Se consulta competición por competición (`/competitions/{code}/matches`) en
+ * vez del endpoint global `/matches`: el global devolvió cero partidos con
+ * este plan aunque el de competición sí traía datos, así que se usa el que
+ * está demostrado que funciona. Cuesta una petición por competición, que con
+ * el límite de 10 por minuto son unos 70 segundos.
+ *
+ * `dateTo` puede ser exclusivo según el endpoint, así que se pide un día de
+ * más y se filtra en local por los días exactos que interesan.
  */
-export async function fetchFixturesByDate(apiKey, date, { budget, includeFinished = false } = {}) {
-  const data = await call(
-    apiKey,
-    '/matches',
-    { dateFrom: date, dateTo: shiftDay(date, 1) },
-    budget,
-  );
-  return (data?.matches ?? [])
-    .map(mapMatch)
-    .filter((m) => m.home && m.away)
-    .filter((m) => m.date.toISOString().slice(0, 10) === date)
-    .filter((m) => (includeFinished ? true : !m.finished));
+export async function fetchFixturesByDateRange(
+  apiKey,
+  days,
+  { leagues = LEAGUES, budget, includeFinished = false, onProgress } = {},
+) {
+  const wanted = new Set(days);
+  const dateFrom = days[0];
+  const dateTo = shiftDay(days[days.length - 1], 1);
+  const out = [];
+
+  for (const league of supportedLeagues(leagues)) {
+    try {
+      const data = await call(
+        apiKey,
+        `/competitions/${league.footballData}/matches`,
+        { dateFrom, dateTo },
+        budget,
+      );
+      const all = (data?.matches ?? []).map(mapMatch).filter((m) => m.home && m.away);
+      const inRange = all.filter((m) => wanted.has(m.date.toISOString().slice(0, 10)));
+      const usable = inRange.filter((m) => (includeFinished ? true : !m.finished));
+      out.push(...usable);
+      onProgress?.(
+        `${league.name}: ${usable.length} de ${inRange.length} en fecha (${all.length} devueltos)`,
+      );
+    } catch (error) {
+      onProgress?.(`${league.name}: ${error.message}`);
+    }
+    await sleep(6500);
+  }
+  return out;
+}
+
+/** Partidos por jugar de una fecha concreta. */
+export async function fetchFixturesByDate(apiKey, date, options = {}) {
+  return fetchFixturesByDateRange(apiKey, [date], options);
 }
 
 /** Resultados ya jugados de una fecha, para mantener el histórico al día. */
-export async function fetchResultsByDate(apiKey, date, { budget } = {}) {
-  const list = await fetchFixturesByDate(apiKey, date, { budget, includeFinished: true });
+export async function fetchResultsByDate(apiKey, date, options = {}) {
+  const list = await fetchFixturesByDateRange(apiKey, [date], {
+    ...options,
+    includeFinished: true,
+  });
   return list.filter((m) => m.finished && m.homeGoals !== null && m.awayGoals !== null);
 }
 
