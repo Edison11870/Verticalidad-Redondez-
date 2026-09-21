@@ -294,9 +294,21 @@ export function buildDailyReport(input, options = {}) {
     (parlayPool.length >= 4 ? parlayPool : ranked).map((p) => ({ ...p })),
   );
 
+  // Días con partidos, para que la web pueda saltar al siguiente cuando hoy
+  // no hay fútbol (parones de selecciones, finales de temporada).
+  const scheduleByDay = new Map();
+  for (const match of matches) {
+    const row = scheduleByDay.get(match.day) ?? { day: match.day, matches: 0, picks: 0 };
+    row.matches += 1;
+    row.picks += match.picks.length;
+    scheduleByDay.set(match.day, row);
+  }
+  const schedule = [...scheduleByDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+
   return {
     generatedAt: now.toISOString(),
     days: { today: todayKey, tomorrow: tomorrowKey },
+    schedule,
     leagues: leagueSummary(matches),
     groups: LEAGUE_GROUPS,
     matches,

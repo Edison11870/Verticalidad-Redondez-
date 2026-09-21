@@ -84,6 +84,18 @@ export const CONFIG = {
   markets: ['1x2', 'dc', 'ou', 'btts', 'ah'],
 
   /**
+   * Horizonte de partidos que se publican.
+   *
+   * La portada es "hoy y mañana", pero el fútbol tiene parones: tras una
+   * jornada puede no haber nada durante dos semanas. Como la descarga trae la
+   * temporada entera de cada competición, ampliar el horizonte no cuesta ni
+   * una petición más, y evita que la web se quede vacía en un parón.
+   */
+  fixtures: {
+    horizonDays: 16,
+  },
+
+  /**
    * Consumo de las APIs. Los planes gratuitos son pequeños y The Odds API
    * cobra UNA petición por cada combinación de región y mercado: pedir
    * `eu,uk,us` con `h2h,totals,spreads` cuesta 9 créditos por liga y por

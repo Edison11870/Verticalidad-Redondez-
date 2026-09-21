@@ -15,6 +15,7 @@ const state = {
   history: null,
   backtest: null,
   view: 'hoy',
+  day: null,
   group: 'todas',
   leagues: new Set(),
   market: 'todos',
@@ -224,6 +225,7 @@ function setView(view) {
   state.view = view;
   $$('.tab').forEach((tab) => tab.setAttribute('aria-selected', String(tab.dataset.view === view)));
   const dayViews = ['hoy', 'manana'];
+  state.day = null;
   $('#view-dia').hidden = !dayViews.includes(view);
   $('#view-combinadas').hidden = view !== 'combinadas';
   $('#view-historial').hidden = view !== 'historial';
@@ -259,9 +261,35 @@ function renderAll() {
   renderModel();
 }
 
+/**
+ * Día que se está mostrando.
+ *
+ * Si el día pedido (hoy o mañana) no tiene partidos —un parón de selecciones
+ * deja el calendario vacío dos semanas— se muestra el siguiente día que sí
+ * los tenga. Una web de pronósticos que se queda en blanco durante quince
+ * días no sirve de nada, y los partidos ya están descargados.
+ */
 function currentDayKey() {
-  return state.view === 'manana' ? state.report.days.tomorrow : state.report.days.today;
+  if (state.day) return state.day;
+  const asked = state.view === 'manana' ? state.report.days.tomorrow : state.report.days.today;
+  const schedule = state.report.schedule ?? [];
+  if (schedule.some((d) => d.day === asked && d.matches > 0)) return asked;
+  const next = schedule.find((d) => d.day >= asked && d.matches > 0);
+  return next?.day ?? asked;
 }
+
+/** ¿Se está mostrando un día distinto al que pidió la pestaña? */
+function isFallbackDay() {
+  const asked = state.view === 'manana' ? state.report.days.tomorrow : state.report.days.today;
+  return currentDayKey() !== asked;
+}
+
+const dayNames = (iso) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('es', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 
 function visibleMatches() {
   const day = currentDayKey();
@@ -277,6 +305,42 @@ function pickPasses(pick) {
   if (state.market !== 'todos' && pick.market !== state.market) return false;
   if (pick.confidence < state.minConfidence) return false;
   return true;
+}
+
+/** Días con partidos, para poder moverse por el calendario descargado. */
+function renderSchedule() {
+  const box = $('#schedule-days');
+  if (!box) return;
+  const schedule = (state.report.schedule ?? []).filter((d) => d.matches > 0);
+  if (schedule.length <= 1) {
+    box.replaceChildren();
+    return;
+  }
+  const active = currentDayKey();
+  box.replaceChildren(
+    ...schedule.slice(0, 14).map((d) =>
+      el(
+        'button',
+        {
+          class: 'chip',
+          type: 'button',
+          'aria-pressed': String(d.day === active),
+          onclick: () => {
+            state.day = d.day;
+            renderDay();
+          },
+        },
+        [
+          new Date(`${d.day}T12:00:00Z`).toLocaleDateString('es', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+          }),
+          el('span', { class: 'chip-count', text: d.matches }),
+        ],
+      ),
+    ),
+  );
 }
 
 function renderFilters() {
@@ -330,11 +394,18 @@ function renderDay() {
   const matches = visibleMatches();
   const picks = matches.flatMap((match) => match.picks.filter(pickPasses));
 
-  $('#day-title').textContent =
-    state.view === 'manana' ? 'Apuestas de mañana' : 'Apuestas de hoy';
-  $('#day-summary').textContent = `${dateLabel(day)} · ${matches.length} partidos · ${
-    picks.length
-  } selecciones con valor`;
+  const fallback = isFallbackDay();
+  $('#day-title').textContent = fallback
+    ? 'Próxima jornada'
+    : state.view === 'manana'
+      ? 'Apuestas de mañana'
+      : 'Apuestas de hoy';
+  $('#day-summary').textContent =
+    (fallback
+      ? `No hay partidos ${state.view === 'manana' ? 'mañana' : 'hoy'}. Se muestra ${dayNames(day)}. · `
+      : `${dateLabel(day)} · `) + `${matches.length} partidos · ${picks.length} selecciones con valor`;
+
+  renderSchedule();
 
   const ranked = [...picks].sort((a, b) => b.score - a.score || b.probability - a.probability);
   const top = ranked.length
