@@ -300,16 +300,28 @@ async function loadFixtures({ keys, now, budget, prematch, provider }) {
       log(`Alineaciones consultadas para ${soon.length} partidos próximos`);
     }
   } else {
-    // Una sola pasada por competición cubre hoy y mañana: con 10 peticiones por
-    // minuto, pedir cada día por separado duplicaría el tiempo sin motivo.
-    const list = await footballData.fetchFixturesByDateRange(keys.footballData, days, {
+    // Se pide el horizonte completo de una vez. La descarga trae la temporada
+    // entera de cada competición, así que cubrir dos semanas en vez de dos días
+    // no cuesta ninguna petición extra y salva los parones de selecciones.
+    const horizon = [];
+    for (let i = 0; i < CONFIG.fixtures.horizonDays; i += 1) {
+      horizon.push(dayKey(new Date(now.getTime() + i * DAY)));
+    }
+    const list = await footballData.fetchFixturesByDateRange(keys.footballData, horizon, {
       budget,
+      now,
       onProgress: (m) => log(' ', m),
     });
     fixtures.push(...list);
-    for (const day of days) {
-      log(`Partidos ${day}: ${list.filter((f) => dayKey(f.date) === day).length}`);
-    }
+
+    const byDay = new Map();
+    for (const f of list) byDay.set(dayKey(f.date), (byDay.get(dayKey(f.date)) ?? 0) + 1);
+    const withMatches = [...byDay.entries()].sort();
+    log(
+      withMatches.length
+        ? `Partidos por día: ${withMatches.map(([d, n]) => `${d}: ${n}`).join(' · ')}`
+        : `Sin partidos en los próximos ${CONFIG.fixtures.horizonDays} días`,
+    );
     log('football-data.org no publica lesiones ni xG: el modelo trabaja sin esas variables.');
   }
 
@@ -491,7 +503,7 @@ async function main() {
     );
 
     if (!fixtures.length) {
-      log('No hay partidos programados para hoy ni mañana en las ligas configuradas.');
+      log('No hay partidos programados en el horizonte configurado.');
     }
   }
 
