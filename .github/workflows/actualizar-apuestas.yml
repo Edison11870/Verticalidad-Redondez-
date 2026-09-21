@@ -1,0 +1,78 @@
+name: Actualizar apuestas
+
+# Dos pasadas, como pide el diseño:
+#  - una completa al día (histórico + reentrenamiento + backtesting)
+#  - varias ligeras antes de los partidos, para refrescar cuotas y alineaciones
+on:
+  schedule:
+    - cron: '20 6 * * *'    # 06:20 UTC — actualización diaria completa
+    - cron: '0 11,15,18 * * *'  # refrescos prepartido
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'Tipo de actualización'
+        required: false
+        default: 'diaria'
+        type: choice
+        options: [diaria, prepartido, demo]
+
+concurrency:
+  group: apuestas-datos
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Comprobar el motor
+        run: npm test
+
+      - name: Decidir el modo
+        id: modo
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "modo=${{ inputs.modo }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "20 6 * * *" ]; then
+            echo "modo=diaria" >> "$GITHUB_OUTPUT"
+          else
+            echo "modo=prepartido" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generar predicciones
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          REQUEST_BUDGET: ${{ vars.REQUEST_BUDGET || '400' }}
+        run: |
+          case "${{ steps.modo.outputs.modo }}" in
+            demo)       node engine/run.js --demo ;;
+            prepartido) node engine/run.js --strict --prematch --no-backtest ;;
+            *)          node engine/run.js --strict ;;
+          esac
+
+      - name: Publicar los datos actualizados
+        run: |
+          if [ -z "$(git status --porcelain apuestas/data)" ]; then
+            echo "Sin cambios que publicar."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apuestas/data
+          git commit -m "Actualizar apuestas (${{ steps.modo.outputs.modo }}) $(date -u '+%Y-%m-%d %H:%M UTC')"
+          for intento in 1 2 3 4; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "Reintento $intento…"; sleep $((2 ** intento))
+          done
+          exit 1

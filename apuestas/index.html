@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0d0d0d">
+<title>Valor Diario · Apuestas de fútbol</title>
+<meta name="description" content="Predicciones de fútbol de todo el mundo con modelo Dixon-Coles, Elo y machine learning. Apuestas de valor esperado positivo por liga, combinadas e historial verificable de aciertos y fallos.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚽</text></svg>">
+<link rel="preload" href="data/latest.json" as="fetch" crossorigin>
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">⚽</span>
+      <div>
+        <h1>Valor Diario</h1>
+        <p class="brand-sub" id="update-line">Cargando datos…</p>
+      </div>
+    </div>
+    <button type="button" id="theme-toggle" class="icon-btn" aria-label="Cambiar entre modo oscuro y claro">
+      <span aria-hidden="true">◐</span>
+    </button>
+  </div>
+
+  <div class="wrap" id="demo-banner" hidden>
+    <p class="banner banner-warn">
+      <strong>Datos de demostración.</strong>
+      <span id="demo-text">No hay claves de API configuradas: los partidos, resultados y cuotas están simulados. El modelo, el backtesting y las combinadas funcionan igual que en producción.</span>
+    </p>
+  </div>
+
+  <nav class="tabs" aria-label="Secciones">
+    <div class="wrap tabs-row" role="tablist">
+      <button class="tab" role="tab" data-view="hoy" aria-selected="true">Hoy</button>
+      <button class="tab" role="tab" data-view="manana" aria-selected="false">Mañana</button>
+      <button class="tab" role="tab" data-view="combinadas" aria-selected="false">Combinadas</button>
+      <button class="tab" role="tab" data-view="historial" aria-selected="false">Historial</button>
+      <button class="tab" role="tab" data-view="modelo" aria-selected="false">Modelo</button>
+    </div>
+  </nav>
+</header>
+
+<main id="contenido" class="wrap">
+
+  <!-- ====== HOY / MAÑANA ====== -->
+  <section class="view" id="view-dia" aria-live="polite">
+    <div class="day-head">
+      <h2 id="day-title">Apuestas de hoy</h2>
+      <p class="muted" id="day-summary"></p>
+    </div>
+
+    <div class="filters" role="group" aria-label="Filtros de competición">
+      <div class="chip-row" id="group-filters"></div>
+      <div class="chip-row chip-row-scroll" id="league-filters"></div>
+      <div class="filter-line">
+        <label class="select-label">
+          Mercado
+          <select id="market-filter">
+            <option value="todos">Todos</option>
+            <option value="1x2">1X2</option>
+            <option value="dc">Doble oportunidad</option>
+            <option value="ou">Más/Menos goles</option>
+            <option value="btts">Ambos anotan</option>
+            <option value="ah">Hándicap</option>
+          </select>
+        </label>
+        <label class="select-label">
+          Confianza mínima
+          <select id="confidence-filter">
+            <option value="0">Cualquiera</option>
+            <option value="55">Media o alta</option>
+            <option value="72">Solo alta</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <section class="block" aria-labelledby="top-title">
+      <div class="block-head">
+        <h3 id="top-title">Top apuestas del día</h3>
+        <p class="muted">Ordenadas por probabilidad de acierto y valor esperado.</p>
+      </div>
+      <div class="pick-list" id="top-picks"></div>
+    </section>
+
+    <section class="block" aria-labelledby="matches-title">
+      <div class="block-head">
+        <h3 id="matches-title">Todos los partidos</h3>
+        <p class="muted" id="matches-note"></p>
+      </div>
+      <div id="match-groups"></div>
+    </section>
+  </section>
+
+  <!-- ====== COMBINADAS ====== -->
+  <section class="view" id="view-combinadas" hidden>
+    <div class="day-head">
+      <h2>Combinadas del día</h2>
+      <p class="muted">Tres niveles de riesgo. La probabilidad combinada es el producto de las probabilidades del modelo, con un descuento por correlación residual: no es la cuota lo que la determina.</p>
+    </div>
+    <div id="parlays"></div>
+    <p class="note" id="parlay-note"></p>
+  </section>
+
+  <!-- ====== HISTORIAL ====== -->
+  <section class="view" id="view-historial" hidden>
+    <div class="day-head">
+      <h2>Historial de aciertos</h2>
+      <p class="muted">Todos los pronósticos publicados, con sus fallos. Si una apuesta se pierde, aparece aquí.</p>
+    </div>
+    <div class="kpi-grid" id="history-kpis"></div>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Evolución del bankroll</h3>
+        <p class="muted">Unidades acumuladas, apostando 1 unidad por pronóstico.</p>
+      </div>
+      <figure class="chart-figure">
+        <div id="bankroll-chart" class="chart"></div>
+        <figcaption class="chart-caption">
+          <button type="button" class="link-btn" data-table-toggle="bankroll-table">Ver datos en tabla</button>
+        </figcaption>
+        <div class="table-wrap" id="bankroll-table" hidden></div>
+      </figure>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>Rendimiento por segmento</h3></div>
+      <div class="segment-tabs chip-row" id="segment-tabs"></div>
+      <div class="table-wrap" id="segment-table"></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Pronósticos liquidados</h3>
+        <p class="muted" id="history-note"></p>
+      </div>
+      <div class="chip-row" id="history-filters"></div>
+      <div id="history-list"></div>
+      <button type="button" class="ghost-btn" id="history-more" hidden>Ver más</button>
+    </section>
+  </section>
+
+  <!-- ====== MODELO ====== -->
+  <section class="view" id="view-modelo" hidden>
+    <div class="day-head">
+      <h2>Modelo y validación</h2>
+      <p class="muted">Cómo se calcula cada número y qué rinde el sistema cuando se prueba contra el pasado.</p>
+    </div>
+
+    <div class="kpi-grid" id="backtest-kpis"></div>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Calibración</h3>
+        <p class="muted">Si el modelo dice 60%, ¿ocurre el 60% de las veces? La línea discontinua es la calibración perfecta.</p>
+      </div>
+      <figure class="chart-figure">
+        <div id="reliability-chart" class="chart"></div>
+        <figcaption class="chart-caption">
+          <button type="button" class="link-btn" data-table-toggle="reliability-table">Ver datos en tabla</button>
+        </figcaption>
+        <div class="table-wrap" id="reliability-table" hidden></div>
+      </figure>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>ROI mensual del backtesting</h3>
+        <p class="muted">Meses en rojo incluidos: una racha mala es parte del juego.</p>
+      </div>
+      <figure class="chart-figure">
+        <div id="monthly-chart" class="chart"></div>
+        <figcaption class="chart-caption">
+          <button type="button" class="link-btn" data-table-toggle="monthly-table">Ver datos en tabla</button>
+        </figcaption>
+        <div class="table-wrap" id="monthly-table" hidden></div>
+      </figure>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h3>Composición del ensamble</h3></div>
+      <div id="model-weights" class="weights"></div>
+      <div class="block-head"><h4>Variables más influyentes</h4></div>
+      <div id="feature-importance" class="weights"></div>
+    </section>
+
+    <section class="block prose" id="methodology">
+      <h3>Metodología</h3>
+      <ol>
+        <li><strong>Dixon-Coles.</strong> Poisson bivariado con fuerza de ataque y defensa por equipo, ventaja de localía, nivel de goles propio de cada competición y corrección para marcadores bajos. Los partidos viejos pesan menos.</li>
+        <li><strong>Elo.</strong> Rating actualizado partido a partido con multiplicador por diferencia de goles.</li>
+        <li><strong>Regresión logística multinomial.</strong> Forma de los últimos 10 partidos, xG a favor y en contra, diferencia de goles, días de descanso, congestión de calendario, bajas e historial directo.</li>
+        <li><strong>Ensamble.</strong> Los pesos de los tres modelos se eligen minimizando el log loss fuera de muestra; después se calibran las probabilidades por temperature scaling.</li>
+        <li><strong>Mercado como prior.</strong> La cuota de consenso, sin margen, se mezcla con la predicción. El mercado concentra dinero e información de última hora; ignorarlo hace que el filtro de valor se quede justo con los partidos donde el modelo más se equivoca.</li>
+        <li><strong>Valor.</strong> Se quita el margen del mercado por el método de potencias, se compara con la probabilidad del modelo y se publica sólo lo que tiene valor esperado positivo. La apuesta se registra a la mejor cuota disponible entre las casas.</li>
+        <li><strong>Validación.</strong> Backtesting walk-forward: en cada fecha el modelo se reentrena sólo con partidos anteriores. Nunca ve el futuro.</li>
+      </ol>
+      <p class="muted" id="model-meta"></p>
+    </section>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <section class="banner banner-danger" aria-labelledby="aviso-title">
+      <h2 id="aviso-title">Aviso importante</h2>
+      <p><strong>Ninguna predicción garantiza resultados.</strong> Todo lo que hay en esta página son estimaciones estadísticas con margen de error. Una apuesta con 80% de probabilidad se pierde una de cada cinco veces, y eso no es un fallo del modelo: es lo que significa 80%.</p>
+      <h3>Gestión de bankroll</h3>
+      <ul id="bankroll-rules">
+        <li>Define un bankroll que puedas perder por completo sin que afecte tu vida.</li>
+        <li>1 unidad = 1% del bankroll. Nunca más de <strong>2,5 unidades</strong> en una sola apuesta.</li>
+        <li>Máximo 12 unidades de exposición total en un día.</li>
+        <li>El stake sugerido usa Kelly fraccionario (¼ de Kelly), no Kelly completo.</li>
+        <li>No persigas pérdidas subiendo el stake. La racha mala llega siempre.</li>
+        <li>Si apostar deja de ser un pasatiempo, busca ayuda: en España, <a href="https://www.jugarbien.es" rel="noopener">jugarbien.es</a>.</li>
+      </ul>
+      <p class="muted">Prohibido para menores de 18 años.</p>
+    </section>
+    <p class="muted foot-line" id="sources-line"></p>
+  </div>
+</footer>
+
+<script src="assets/js/app.js" type="module"></script>
+</body>
+</html>
