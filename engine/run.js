@@ -216,12 +216,15 @@ async function loadHistory({ keys, now, budget, forceFull }) {
     const from = new Date(cache.updatedAt.getTime() - 2 * DAY);
     const days = datesBetween(from, now);
     log(`Caché al día (${cache.matches.length} partidos): actualizando ${days.length} fechas.`);
-    for (const day of days) {
-      try {
-        fresh.push(...(await footballData.fetchResultsByDate(keys.footballData, day, { budget })));
-      } catch (error) {
-        log(`  No se pudieron leer los resultados de ${day}: ${error.message}`);
-      }
+    try {
+      const list = await footballData.fetchFixturesByDateRange(keys.footballData, days, {
+        budget,
+        includeFinished: true,
+        onProgress: (m) => log(' ', m),
+      });
+      fresh.push(...list.filter((m) => m.finished && m.homeGoals !== null));
+    } catch (error) {
+      log(`  No se pudieron leer los resultados recientes: ${error.message}`);
     }
   } else {
     log(`Caché al día (${cache.matches.length} partidos).`);
@@ -297,10 +300,15 @@ async function loadFixtures({ keys, now, budget, prematch, provider }) {
       log(`Alineaciones consultadas para ${soon.length} partidos próximos`);
     }
   } else {
+    // Una sola pasada por competición cubre hoy y mañana: con 10 peticiones por
+    // minuto, pedir cada día por separado duplicaría el tiempo sin motivo.
+    const list = await footballData.fetchFixturesByDateRange(keys.footballData, days, {
+      budget,
+      onProgress: (m) => log(' ', m),
+    });
+    fixtures.push(...list);
     for (const day of days) {
-      const list = await footballData.fetchFixturesByDate(keys.footballData, day, { budget });
-      fixtures.push(...list);
-      log(`Partidos ${day}: ${list.length}`);
+      log(`Partidos ${day}: ${list.filter((f) => dayKey(f.date) === day).length}`);
     }
     log('football-data.org no publica lesiones ni xG: el modelo trabaja sin esas variables.');
   }
