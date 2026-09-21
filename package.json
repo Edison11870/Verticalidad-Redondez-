@@ -1,0 +1,18 @@
+{
+  "name": "valor-diario",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Predicciones diarias de fútbol con valor esperado positivo: Dixon-Coles + Elo + machine learning, publicadas como web estática.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "update": "node engine/run.js",
+    "prematch": "node engine/run.js --prematch",
+    "demo": "node engine/run.js --demo",
+    "serve": "python3 -m http.server 8080",
+    "test": "node --test engine/test.js",
+    "check": "node engine/run.js --check"
+  }
+}

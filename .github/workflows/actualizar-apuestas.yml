@@ -1,0 +1,125 @@
+name: Actualizar apuestas
+
+# Tres disparadores:
+#  - al fusionar en main, para que la primera publicación real no espere al horario
+#  - una pasada completa al día
+#  - un refresco antes de los partidos
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'engine/**'
+      - '.github/workflows/actualizar-apuestas.yml'
+  schedule:
+    - cron: '20 6 * * *'   # 06:20 UTC — actualización diaria completa
+    - cron: '0 16 * * *'   # 16:00 UTC — refresco prepartido
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'Tipo de actualización'
+        required: false
+        default: 'diaria'
+        type: choice
+        options: [diaria, prepartido, comprobar-claves, recargar-historico]
+
+concurrency:
+  group: apuestas-datos
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+      FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      REQUEST_BUDGET: ${{ vars.REQUEST_BUDGET || '400' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Comprobar el motor
+        run: npm test
+
+      - name: ¿Hay claves configuradas?
+        id: claves
+        run: |
+          if [ -n "$API_FOOTBALL_KEY" ] || [ -n "$FOOTBALL_DATA_KEY" ]; then
+            echo "hay=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hay=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Falta configurar las claves de datos"
+              echo ""
+              echo "No se ha publicado nada porque no hay ninguna fuente de datos conectada."
+              echo "Añade \`API_FOOTBALL_KEY\` (o \`FOOTBALL_DATA_KEY\`) y \`ODDS_API_KEY\` en"
+              echo "**Settings → Secrets and variables → Actions** y vuelve a lanzar este flujo."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Si la clave existe pero no vale, esto falla y se ve: es justo lo que
+      # queremos saber. Si simplemente no hay claves, el paso anterior ya lo dijo.
+      - name: Validar las claves
+        if: steps.claves.outputs.hay == 'true'
+        run: node engine/run.js --check
+
+      - name: Decidir el modo
+        if: steps.claves.outputs.hay == 'true'
+        id: modo
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "modo=${{ inputs.modo }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 16 * * *" ]; then
+            echo "modo=prepartido" >> "$GITHUB_OUTPUT"
+          else
+            echo "modo=diaria" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generar predicciones
+        if: steps.claves.outputs.hay == 'true' && steps.modo.outputs.modo != 'comprobar-claves'
+        run: |
+          case "${{ steps.modo.outputs.modo }}" in
+            prepartido)         node engine/run.js --prematch --no-backtest ;;
+            recargar-historico) node engine/run.js --full-history ;;
+            *)                  node engine/run.js ;;
+          esac
+
+      - name: Publicar los datos actualizados
+        if: steps.claves.outputs.hay == 'true' && steps.modo.outputs.modo != 'comprobar-claves'
+        run: |
+          if [ -z "$(git status --porcelain apuestas/data)" ]; then
+            echo "Sin cambios que publicar."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apuestas/data
+          git commit -m "Actualizar apuestas (${{ steps.modo.outputs.modo }}) $(date -u '+%Y-%m-%d %H:%M UTC')"
+          for intento in 1 2 3 4; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "Reintento $intento…"; sleep $((2 ** intento))
+          done
+          exit 1
+
+      - name: Resumen
+        if: steps.claves.outputs.hay == 'true' && steps.modo.outputs.modo != 'comprobar-claves'
+        run: |
+          {
+            echo "### Actualización ${{ steps.modo.outputs.modo }}"
+            echo ""
+            node -e "
+              const r = require('./apuestas/data/latest.json');
+              console.log('- Partidos: ' + r.matches.length);
+              console.log('- Apuestas destacadas: ' + r.topPicks.length);
+              console.log('- Fuentes: ' + (r.dataSources || []).join(', '));
+              if (r.oddsCredits) console.log('- Créditos de cuotas: ' + r.oddsCredits.used + ' usados, quedan ' + r.oddsCredits.remaining);
+              if (!r.hasOdds) console.log('- Sin cuotas: probabilidades reales, pero sin apuestas de valor.');
+            "
+          } >> "$GITHUB_STEP_SUMMARY"
