@@ -1,6 +1,15 @@
 /**
  * Catálogo de competiciones y parámetros globales.
  *
+ * Dos avisos sobre los proveedores:
+ *
+ * - El plan GRATUITO de API-Football sólo da acceso a temporadas antiguas
+ *   (responde "Free plans do not have access to this season, try from 2022 to
+ *   2024"), así que no sirve para predecir los partidos de hoy. Para usarlo de
+ *   verdad hace falta un plan de pago; si no, usa football-data.org.
+ * - football-data.org sí incluye la temporada en curso en su plan gratuito,
+ *   pero sólo cubre las competiciones con código `footballData` en esta lista.
+ *
  * Los IDs de API-Football pueden cambiar entre temporadas: verifícalos con
  * GET https://v3.football.api-sports.io/leagues?search=<nombre> si alguna liga
  * deja de traer partidos.

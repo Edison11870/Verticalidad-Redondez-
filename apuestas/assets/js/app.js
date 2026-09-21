@@ -123,13 +123,29 @@ async function boot() {
 
 /** Estado "faltan claves": la página lo dice y explica qué hacer. */
 function renderSetup(report) {
-  $('#update-line').textContent = 'Pendiente de configurar';
+  $('#update-line').textContent = report.problem
+    ? 'La última actualización falló'
+    : 'Pendiente de configurar';
   document.querySelector('.tabs').hidden = true;
   for (const id of ['view-dia', 'view-combinadas', 'view-historial', 'view-modelo']) {
     const node = document.getElementById(id);
     if (node) node.hidden = true;
   }
   $('#view-setup').hidden = false;
+
+  // Si la última actualización falló por un motivo concreto (por ejemplo, un
+  // plan de API sin acceso a la temporada actual), se dice aquí: una página
+  // muda no ayuda a arreglar nada.
+  $('#setup-problem').replaceChildren(
+    ...(report.problem
+      ? [
+          el('div', { class: 'banner banner-danger' }, [
+            el('h2', { text: report.problem.title }),
+            el('ul', {}, (report.problem.details ?? []).map((d) => el('li', { text: d }))),
+          ]),
+        ]
+      : []),
+  );
 
   $('#setup-keys').replaceChildren(
     ...(report.missingKeys ?? []).map((key) =>
