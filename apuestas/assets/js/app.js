@@ -41,6 +41,10 @@ const num = (n, digits = 2) =>
 
 const units = (n) => `${n > 0 ? '+' : ''}${Number(n).toFixed(2)} u`;
 
+/** Singular o plural según la cantidad ("1 partido" / "3 partidos"). */
+const plural = (n, singular, pluralForm = `${singular}s`) =>
+  `${n} ${n === 1 ? singular : pluralForm}`;
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
@@ -246,7 +250,7 @@ function renderAll() {
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-  })} · ${report.matches.length} partidos`;
+  })} · ${plural(report.matches.length, 'partido')}`;
 
   $('#demo-banner').hidden = !report.demo;
   $('#odds-banner').hidden = report.demo || report.hasOdds !== false;
@@ -403,7 +407,8 @@ function renderDay() {
   $('#day-summary').textContent =
     (fallback
       ? `No hay partidos ${state.view === 'manana' ? 'mañana' : 'hoy'}. Se muestra ${dayNames(day)}. · `
-      : `${dateLabel(day)} · `) + `${matches.length} partidos · ${picks.length} selecciones con valor`;
+      : `${dateLabel(day)} · `) +
+    `${plural(matches.length, 'partido')} · ${plural(picks.length, 'selección', 'selecciones')} con valor`;
 
   renderSchedule();
 
@@ -428,7 +433,11 @@ function renderDay() {
   }
 
   const withOdds = matches.filter((m) => m.hasOdds).length;
-  $('#matches-note').textContent = `${withOdds} de ${matches.length} partidos tienen cuotas disponibles. Toca un partido para ver todos los mercados.`;
+  $('#matches-note').textContent =
+    (state.report.hasOdds === false
+      ? 'Sin cuotas configuradas: se muestran las probabilidades del modelo. '
+      : `${withOdds} de ${plural(matches.length, 'partido')} con cuotas disponibles. `) +
+    'Toca un partido para ver todos los mercados.';
   renderMatchGroups(matches);
 }
 
@@ -508,7 +517,7 @@ function renderMatchGroups(matches) {
       return el('section', { class: 'league-group' }, [
         el('div', { class: 'league-head' }, [
           el('h4', { text: sorted[0].league }),
-          el('span', { class: 'muted', text: `${sorted.length} partidos` }),
+          el('span', { class: 'muted', text: plural(sorted.length, 'partido') }),
         ]),
         el('div', { class: 'match-list' }, sorted.map(matchCard)),
       ]);
