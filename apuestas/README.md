@@ -30,9 +30,21 @@ npm run demo             # datos simulados, sólo para desarrollo
 
 | Variable | Proveedor | Para qué |
 |---|---|---|
-| `API_FOOTBALL_KEY` | [api-sports.io](https://www.api-football.com/) | partidos, resultados, xG, lesiones y alineaciones |
-| `FOOTBALL_DATA_KEY` | [football-data.org](https://www.football-data.org/) | alternativa gratuita (menos ligas, sin xG ni lesiones) |
+| `FOOTBALL_DATA_KEY` | [football-data.org](https://www.football-data.org/) | partidos y resultados de la temporada en curso — **gratis** |
+| `API_FOOTBALL_KEY` | [api-sports.io](https://www.api-football.com/) | lo mismo más xG, lesiones y alineaciones, y muchas más ligas — **requiere plan de pago** |
 | `ODDS_API_KEY` | [the-odds-api.com](https://the-odds-api.com/) | cuotas de varias casas para comparar |
+
+> **El plan gratuito de API-Football no sirve para esto.** Sólo permite
+> temporadas antiguas: responde literalmente `Free plans do not have access to
+> this season, try from 2022 to 2024`. Como el objetivo es predecir los
+> partidos de hoy, con ese plan no hay nada que hacer. La opción gratuita que
+> sí funciona es football-data.org, que cubre Champions, las cinco grandes
+> ligas europeas, Brasileirão, Championship, Eredivisie y Primeira Liga.
+>
+> Si configuras las dos claves, el motor prueba primero API-Football y, si no
+> devuelve partidos, cae automáticamente a football-data.org. Siempre usa el
+> mismo proveedor para el histórico y para los partidos del día: mezclarlos
+> rompería el emparejado de nombres de equipo.
 
 ```bash
 export API_FOOTBALL_KEY=...

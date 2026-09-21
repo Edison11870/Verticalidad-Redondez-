@@ -137,14 +137,29 @@ function estimateOddsCost() {
 
 /* ------------------------------ descarga ----------------------------- */
 
-/** Histórico: descarga completa la primera vez, incremental después. */
+/**
+ * Histórico: descarga completa la primera vez, incremental después.
+ *
+ * Si hay dos proveedores configurados y el primero no devuelve nada (el caso
+ * típico: el plan gratuito de API-Football sólo permite temporadas 2022-2024,
+ * así que no sirve para la temporada en curso), se prueba el segundo. El
+ * proveedor elegido se devuelve para que los partidos del día se pidan a la
+ * MISMA fuente: mezclarlas rompería el emparejado de nombres de equipo entre
+ * el histórico y los partidos por jugar.
+ */
 async function loadHistory({ keys, now, budget, forceFull }) {
   const cachePath = resolve(ROOT, CONFIG.cache.historyFile);
   const cache = await readHistoryCache(cachePath);
   const ageDays = cache.updatedAt ? (now - cache.updatedAt) / DAY : Infinity;
   const needsFull = forceFull || !cache.matches.length || ageDays > CONFIG.cache.refreshDays;
 
+  const providers = [];
+  if (keys.apiFootball) providers.push('api-football');
+  if (keys.footballData) providers.push('football-data');
+
   let fresh = [];
+  let provider = cache.source ?? providers[0] ?? null;
+  const problems = [];
 
   if (needsFull) {
     log(
@@ -152,28 +167,58 @@ async function loadHistory({ keys, now, budget, forceFull }) {
         ? `Caché de ${cache.matches.length} partidos con ${ageDays.toFixed(0)} días: recarga completa.`
         : 'Sin caché de histórico: primera descarga completa (es la más cara en peticiones).',
     );
-    if (keys.apiFootball) {
-      fresh = await apiFootball.fetchHistory(keys.apiFootball, {
-        seasons: CONFIG.model.historySeasons,
-        budget,
-        onProgress: (m) => log(' ', m),
-      });
-    } else {
-      fresh = await footballData.fetchHistory(keys.footballData, {
-        seasons: CONFIG.model.historySeasons,
-        budget,
-        onProgress: (m) => log(' ', m),
-      });
+
+    for (const candidate of providers) {
+      const messages = [];
+      const onProgress = (m) => {
+        messages.push(m);
+        log(' ', m);
+      };
+      try {
+        fresh =
+          candidate === 'api-football'
+            ? await apiFootball.fetchHistory(keys.apiFootball, {
+                seasons: CONFIG.model.historySeasons,
+                budget,
+                onProgress,
+              })
+            : await footballData.fetchHistory(keys.footballData, {
+                leagues: footballData.supportedLeagues(),
+                seasons: CONFIG.model.historySeasons,
+                budget,
+                onProgress,
+              });
+      } catch (error) {
+        messages.push(error.message);
+        fresh = [];
+      }
+
+      if (fresh.length) {
+        provider = candidate;
+        break;
+      }
+
+      problems.push({ provider: candidate, reason: diagnose(candidate, messages) });
+      log(`  ${candidate} no devolvió ningún partido. ${problems.at(-1).reason}`);
     }
-  } else if (keys.apiFootball) {
-    // Incremental: una petición por día pendiente cubre todas las ligas.
+  } else if (provider === 'api-football' && keys.apiFootball) {
     const from = new Date(cache.updatedAt.getTime() - 2 * DAY);
     const days = datesBetween(from, now);
     log(`Caché al día (${cache.matches.length} partidos): actualizando ${days.length} fechas.`);
     for (const day of days) {
       try {
-        const results = await apiFootball.fetchResultsByDate(keys.apiFootball, day, { budget });
-        fresh.push(...results);
+        fresh.push(...(await apiFootball.fetchResultsByDate(keys.apiFootball, day, { budget })));
+      } catch (error) {
+        log(`  No se pudieron leer los resultados de ${day}: ${error.message}`);
+      }
+    }
+  } else if (provider === 'football-data' && keys.footballData) {
+    const from = new Date(cache.updatedAt.getTime() - 2 * DAY);
+    const days = datesBetween(from, now);
+    log(`Caché al día (${cache.matches.length} partidos): actualizando ${days.length} fechas.`);
+    for (const day of days) {
+      try {
+        fresh.push(...(await footballData.fetchResultsByDate(keys.footballData, day, { budget })));
       } catch (error) {
         log(`  No se pudieron leer los resultados de ${day}: ${error.message}`);
       }
@@ -185,19 +230,37 @@ async function loadHistory({ keys, now, budget, forceFull }) {
   const matches = mergeMatches(cache.matches, fresh, CONFIG.cache.maxAgeDays);
   if (matches.length) {
     await writeHistoryCache(cachePath, matches, {
-      source: keys.apiFootball ? 'API-Football' : 'football-data.org',
+      source: provider,
       seasons: CONFIG.model.historySeasons,
     });
   }
-  return { matches, added: fresh.length, fullRefresh: needsFull };
+  return { matches, added: fresh.length, fullRefresh: needsFull, provider, problems };
+}
+
+/** Traduce el error del proveedor a algo accionable. */
+function diagnose(provider, messages) {
+  const text = messages.join(' | ');
+  if (/Free plans do not have access to this season/i.test(text)) {
+    const range = /try from (\d{4}) to (\d{4})/i.exec(text);
+    return `El plan gratuito de API-Football sólo permite las temporadas ${range ? `${range[1]}-${range[2]}` : 'antiguas'}, no la actual. Configura FOOTBALL_DATA_KEY (gratis, con temporada en curso) o sube de plan en API-Football.`;
+  }
+  if (/401|403|invalid|token/i.test(text)) {
+    return 'La clave fue rechazada por el proveedor. Revisa que el secreto no tenga espacios de más.';
+  }
+  if (/429|rate/i.test(text)) {
+    return 'Se agotó el límite de peticiones del proveedor. Espera y vuelve a intentarlo.';
+  }
+  return provider === 'api-football'
+    ? 'API-Football no devolvió partidos para las ligas y temporadas configuradas.'
+    : 'football-data.org no devolvió partidos para las competiciones configuradas.';
 }
 
 /** Partidos de hoy y mañana, con lesiones y (si toca) alineaciones. */
-async function loadFixtures({ keys, now, budget, prematch }) {
+async function loadFixtures({ keys, now, budget, prematch, provider }) {
   const fixtures = [];
   const days = [dayKey(now), dayKey(new Date(now.getTime() + DAY))];
 
-  if (keys.apiFootball) {
+  if (provider === 'api-football') {
     for (const day of days) {
       const list = await apiFootball.fetchFixturesByDate(keys.apiFootball, day, { budget });
       fixtures.push(...list);
@@ -239,6 +302,7 @@ async function loadFixtures({ keys, now, budget, prematch }) {
       fixtures.push(...list);
       log(`Partidos ${day}: ${list.length}`);
     }
+    log('football-data.org no publica lesiones ni xG: el modelo trabaja sin esas variables.');
   }
 
   return fixtures;
@@ -385,13 +449,29 @@ async function main() {
 
     const history = await loadHistory({ keys, now, budget, forceFull: args.fullHistory });
     if (!history.matches.length) {
-      log('El proveedor no devolvió histórico: se aborta para no publicar predicciones sin base.');
+      // No se publica nada inventado, pero sí se explica el motivo en la web:
+      // una página que se queda muda no ayuda a arreglar el problema.
+      const state = setupState(keys, now);
+      state.problem = {
+        title: 'Los proveedores configurados no devolvieron partidos',
+        details: history.problems.map((p) => `${p.provider}: ${p.reason}`),
+      };
+      await writeJson(`${args.out}/latest.json`, state);
+      for (const p of history.problems) log(`${p.provider}: ${p.reason}`);
+      log('Se aborta para no publicar predicciones sin base.');
       process.exitCode = 1;
       return;
     }
-    sources.push(keys.apiFootball ? 'API-Football' : 'football-data.org');
+    log(`Proveedor de datos: ${history.provider}`);
+    sources.push(history.provider === 'api-football' ? 'API-Football' : 'football-data.org');
 
-    const fixtures = await loadFixtures({ keys, now, budget, prematch: args.prematch });
+    const fixtures = await loadFixtures({
+      keys,
+      now,
+      budget,
+      prematch: args.prematch,
+      provider: history.provider,
+    });
     const odds = await loadOdds({ keys, fixtures, now, budget, prematch: args.prematch });
     if (keys.odds) sources.push('The Odds API');
     oddsCredits = odds.credits;
