@@ -29,13 +29,6 @@ async function call(apiKey, path, params = {}, budget) {
   return getJson(url.toString(), { headers: { 'X-Auth-Token': apiKey } });
 }
 
-/** Un día UTC en formato YYYY-MM-DD. */
-function shiftDay(day, days) {
-  const date = new Date(`${day}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 /** Competiciones de LEAGUES que este proveedor puede servir. */
 export function supportedLeagues(leagues = LEAGUES) {
   return leagues.filter((l) => l.footballData);
@@ -98,26 +91,32 @@ export async function fetchHistory(apiKey, { leagues = LEAGUES, seasons = 2, bud
   return out;
 }
 
+/** Temporada en curso según el calendario europeo (agosto-mayo). */
+function currentSeasonYear(now = new Date()) {
+  return now.getUTCMonth() + 1 >= 7 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+}
+
 /**
- * Partidos de un rango de fechas.
+ * Partidos de unas fechas concretas.
  *
- * Se consulta competición por competición (`/competitions/{code}/matches`) en
- * vez del endpoint global `/matches`: el global devolvió cero partidos con
- * este plan aunque el de competición sí traía datos, así que se usa el que
- * está demostrado que funciona. Cuesta una petición por competición, que con
- * el límite de 10 por minuto son unos 70 segundos.
+ * Se pide la temporada completa de cada competición y se filtra en local, en
+ * vez de delegar el filtro de fechas en la API. Motivo: la llamada con
+ * `season` es la única que está demostrada contra este plan (es la que trae el
+ * histórico), mientras que `/matches` global y `dateFrom`/`dateTo` devolvieron
+ * listas vacías sin dar error. Una petición por competición cuesta lo mismo y
+ * elimina la ambigüedad de qué significa cada parámetro.
  *
- * `dateTo` puede ser exclusivo según el endpoint, así que se pide un día de
- * más y se filtra en local por los días exactos que interesan.
+ * El registro incluye los próximos partidos de cada competición aunque caigan
+ * fuera del rango pedido: si un día no hay fútbol, conviene poder distinguirlo
+ * de un filtro que se está comiendo los datos.
  */
 export async function fetchFixturesByDateRange(
   apiKey,
   days,
-  { leagues = LEAGUES, budget, includeFinished = false, onProgress } = {},
+  { leagues = LEAGUES, budget, includeFinished = false, onProgress, now = new Date() } = {},
 ) {
   const wanted = new Set(days);
-  const dateFrom = days[0];
-  const dateTo = shiftDay(days[days.length - 1], 1);
+  const season = currentSeasonYear(now);
   const out = [];
 
   for (const league of supportedLeagues(leagues)) {
@@ -125,15 +124,22 @@ export async function fetchFixturesByDateRange(
       const data = await call(
         apiKey,
         `/competitions/${league.footballData}/matches`,
-        { dateFrom, dateTo },
+        { season },
         budget,
       );
       const all = (data?.matches ?? []).map(mapMatch).filter((m) => m.home && m.away);
       const inRange = all.filter((m) => wanted.has(m.date.toISOString().slice(0, 10)));
       const usable = inRange.filter((m) => (includeFinished ? true : !m.finished));
       out.push(...usable);
+
+      const upcoming = all
+        .filter((m) => !m.finished && m.date >= now)
+        .sort((a, b) => a.date - b.date)
+        .slice(0, 2)
+        .map((m) => `${m.date.toISOString().slice(0, 16)} ${m.home}-${m.away}`);
       onProgress?.(
-        `${league.name}: ${usable.length} de ${inRange.length} en fecha (${all.length} devueltos)`,
+        `${league.name}: ${usable.length} en fecha de ${all.length} de la temporada` +
+          (upcoming.length ? ` · próximos: ${upcoming.join(' | ')}` : ' · sin partidos futuros'),
       );
     } catch (error) {
       onProgress?.(`${league.name}: ${error.message}`);
@@ -148,7 +154,7 @@ export async function fetchFixturesByDate(apiKey, date, options = {}) {
   return fetchFixturesByDateRange(apiKey, [date], options);
 }
 
-/** Resultados ya jugados de una fecha, para mantener el histórico al día. */
+/** Resultados ya jugados de unas fechas, para mantener el histórico al día. */
 export async function fetchResultsByDate(apiKey, date, options = {}) {
   const list = await fetchFixturesByDateRange(apiKey, [date], {
     ...options,
